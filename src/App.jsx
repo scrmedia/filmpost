@@ -135,14 +135,14 @@ function saveSession(u) { STORE.session = u; }
 function clearSession() { STORE.session = null; }
 
 async function callClaude(systemPrompt, userPrompt, apiKey) {
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+  const response = await fetch('/api/claude', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
+      model: 'claude-sonnet-4-20250514',
       max_tokens: 1000,
       system: systemPrompt,
-      messages: [{ role: "user", content: userPrompt }],
+      messages: [{ role: 'user', content: userPrompt }],
     }),
   });
   if (!response.ok) {
@@ -150,7 +150,7 @@ async function callClaude(systemPrompt, userPrompt, apiKey) {
     throw new Error(err?.error?.message || `API error ${response.status}`);
   }
   const data = await response.json();
-  return data.content?.[0]?.text || "";
+  return data.content?.[0]?.text || '';
 }
 
 // Build a business footer string for use in YouTube descriptions
