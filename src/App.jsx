@@ -134,7 +134,7 @@ function getSession() { return STORE.session; }
 function saveSession(u) { STORE.session = u; }
 function clearSession() { STORE.session = null; }
 
-async function callClaude(systemPrompt, userPrompt, apiKey) {
+async function callClaude(systemPrompt, userPrompt) {
   const response = await fetch('/api/claude', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -251,14 +251,14 @@ function Onboarding({ onComplete }) {
   const update = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
   const testApiKey = async () => {
-    if (!form.apiKey) { setError("Please enter your API key"); return; }
-    setLoading(true); setError("");
-    try {
-      await callClaude("You are a test.", "Say ok.", form.apiKey);
-      setStep(3);
-    } catch (e) { setError("API key invalid: " + e.message); }
-    finally { setLoading(false); }
-  };
+  if (!form.apiKey) { setError("Please enter your API key"); return; }
+  setLoading(true); setError("");
+  try {
+    await callClaude("You are a test.", "Say ok.");
+    setStep(4);
+  } catch (e) { setError("Connection failed: " + e.message); }
+  finally { setLoading(false); }
+};
 
   const finish = () => {
     const users = getUsers();
@@ -417,7 +417,7 @@ function UploadWizard({ user, onSaveUser }) {
       const ytRaw = await callClaude(
         "You are an expert SEO copywriter for wedding videography. Return ONLY valid JSON with keys: title (max 100 chars), descriptionBody (the main content, max 300 words — do NOT include business contact details as these will be appended automatically), tags (array of 15 strings). No markdown.",
         `Generate YouTube metadata for a cinematic wedding film.\n${baseContext}\nTitle should include venue name and be SEO-friendly. descriptionBody should be compelling, describe the wedding and venue, and end with a soft call to action — but do NOT include any contact details, social links, or business footer (these are added automatically).`,
-        user.apiKey
+        
       );
       const ytParsed = JSON.parse(ytRaw.replace(/```json|```/g, "").trim());
       // Assemble the full description by appending the business footer
@@ -428,7 +428,7 @@ function UploadWizard({ user, onSaveUser }) {
       const blogRaw = await callClaude(
         "You are an expert wedding blog writer for a UK wedding videography company. Write in a warm, first-person voice. Return ONLY valid JSON with keys: title (string), metaDescription (max 155 chars), content (full HTML, 900-1100 words using h2, h3, p, ul tags). No markdown wrapper.",
         `Write a venue guide blog post for ${user.businessName}.\n${baseContext}\nTarget keyword: "wedding videographer ${venue}". Include: scene-setting intro, filming highlights, lighting tips, personal anecdote if provided, insider tips, CTA to enquire.`,
-        user.apiKey
+        
       );
       const blog = JSON.parse(blogRaw.replace(/```json|```/g, "").trim());
 
