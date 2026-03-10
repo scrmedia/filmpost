@@ -171,7 +171,8 @@ export function UploadPage({ user, onSuccess }) {
             return;
           }
           offset = end + 1;
-          if (!aborted) setYtUpload(u => ({ ...u, progress: Math.round((offset / totalSize) * 100) }));
+          const progress = Math.round((offset / totalSize) * 100);
+          if (!aborted) setYtUpload(u => ({ ...u, progress }));
         }
       } catch (e) {
         if (!aborted) setYtUpload({ state: "idle", progress: 0, videoId: null, error: e.message });
