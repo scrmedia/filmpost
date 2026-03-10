@@ -15,6 +15,7 @@ export const VENUE_QUESTIONS = [
   { id: "standoutMemory", label: "A Standout or Memorable Moment", placeholder: "Share a specific story — a moment that made a wedding here unforgettable...", type: "textarea" },
   { id: "proTip", label: "Your Pro Videographer Tip", placeholder: "What advice would you give couples to get the most from filming here?", type: "textarea" },
   { id: "coupleNames", label: "Featured Couple's Names", placeholder: "e.g. Emily & James — leave blank to omit", type: "text" },
+  { id: "venueWebsite", label: "Venue Website", placeholder: "https://www.venuename.co.uk — leave blank if unknown", type: "text" },
 ];
 
 export function buildBusinessFooter(user) {

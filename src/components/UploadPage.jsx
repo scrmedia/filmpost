@@ -16,6 +16,10 @@ export function UploadPage({ user, onSuccess }) {
   const [loadingMsg, setLoadingMsg] = useState("");
   const [error, setError] = useState("");
 
+  // Hero image
+  const [heroImage, setHeroImage] = useState(null);
+  const [heroImagePreview, setHeroImagePreview] = useState(null);
+
   // Publish results
   const [wpResult, setWpResult] = useState(null);   // { success, editUrl?, error? }
   const [ytUploadUri, setYtUploadUri] = useState(null);
@@ -25,11 +29,13 @@ export function UploadPage({ user, onSuccess }) {
   const ytUploadStarted = useRef(false);
   const wpPostIdRef = useRef(null);       // WP post ID — needed by the upload useEffect
   const blogContentRef = useRef("");      // current blogContent — needed by the upload useEffect
+  const heroImageRef = useRef(null);      // current heroImage — needed by the upload useEffect
   const dropRef = useRef(null);
   const [dragOver, setDragOver] = useState(false);
 
-  // Keep ref in sync so the upload useEffect always reads the latest blog content
+  // Keep refs in sync so the upload useEffect always reads the latest values
   useEffect(() => { blogContentRef.current = blogContent; }, [blogContent]);
+  useEffect(() => { heroImageRef.current = heroImage; }, [heroImage]);
 
   // ── File handling ──────────────────────────────────────────────────────────
   const handleDrop = useCallback((e) => {
@@ -43,6 +49,14 @@ export function UploadPage({ user, onSuccess }) {
     if (f && f.type.startsWith("video/")) setFile(f);
   };
 
+  const handleHeroImageSelect = (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (heroImagePreview) URL.revokeObjectURL(heroImagePreview);
+    setHeroImage(f);
+    setHeroImagePreview(URL.createObjectURL(f));
+  };
+
   // ── Generate content ───────────────────────────────────────────────────────
   const generateContent = async () => {
     setLoading(true); setLoadingMsg("Crafting your content with AI..."); setError("");
@@ -50,14 +64,14 @@ export function UploadPage({ user, onSuccess }) {
       const toneInstruction = user?.tone_of_voice
         ? `\n\nWrite in a style that reflects this brand voice: ${user.tone_of_voice}`
         : "";
-      const systemPrompt = `You are an expert copywriter for luxury UK wedding videographers. Write in elegant British English, using evocative but authentic language. Avoid clichés and overly salesy phrasing. Focus on emotion, atmosphere, and the couple's story.${toneInstruction}`;
+      const systemPrompt = `You are a wedding videographer writing about your own work. Write like a real person who films weddings for a living — warm, genuine, and specific to the day. Use plain British English. No fancy words, no flowery language, no corporate tone. Write short sentences. Be direct. Sound human. Never use these words or phrases: breathtaking, stunning, magical, timeless, seamlessly, meticulously, elegant, bespoke, enchanting, nestled, picturesque, idyllic, effortlessly, truly, really special, or any em dashes (—).${toneInstruction}`;
       const answersText = VENUE_QUESTIONS.map(q => venueAnswers[q.id] ? `${q.label}: ${venueAnswers[q.id]}` : "").filter(Boolean).join("\n");
 
-      const title = await callClaude(systemPrompt, `Create a YouTube title for a wedding film at "${venueName}". Elegant, include venue name, under 70 characters. Return ONLY the title, no quotes.`);
+      const title = await callClaude(systemPrompt, `Write a YouTube title for a wedding film at "${venueName}". Include the venue name. Keep it under 70 characters. Sound natural, not like a magazine headline. Return ONLY the title, no quotes.`);
       setYoutubeTitle(title.trim());
 
       const footer = buildBusinessFooter(user);
-      const desc = await callClaude(systemPrompt, `Write a YouTube description for this wedding film:\nVenue: ${venueName}\n${answersText}\n\nInclude an evocative opening, filming highlights, then end with this exact footer:\n\n${footer}\n\nUnder 4000 characters. Return ONLY the description text.`);
+      const desc = await callClaude(systemPrompt, `Write a YouTube description for this wedding film:\nVenue: ${venueName}\n${answersText}\n\nStart with a short, natural opening sentence or two about the day — written like a videographer talking about a wedding they genuinely loved filming. Then cover the filming highlights in plain, specific language. No em dashes. No fancy adjectives. Just honest, warm copy.\n\nEnd with this exact footer:\n\n${footer}\n\nUnder 4000 characters. Return ONLY the description text.`);
       setYoutubeDesc(desc.trim());
 
       const seoPlugin = user?.seo_plugin || "";
@@ -93,8 +107,78 @@ Slug: [url-friendly, lowercase, hyphens, no domain]
 <!-- END ALL IN ONE SEO -->`
         : "";
 
-      const blog = await callClaude(systemPrompt, `Write an 800-1200 word blog post about filming a wedding at "${venueName}" for a wedding videographer's website.\n\n${answersText}\n\nStructure: compelling headline, immersive opening, sections on venue/atmosphere/filming highlights, subtle CTA. Use HTML: <h2>, <p>, <strong>.${seoSection}\n\nReturn ONLY the HTML (and the SEO block if requested, as plain text after the HTML).`);
+      const businessName = user?.business_name || "the videographer";
+      const businessUrl = user?.website || "";
+      const blog = await callClaude(systemPrompt, `Write an SEO-optimised blog post (900-1200 words) for a wedding videographer's website about filming a wedding at "${venueName}".
+
+${answersText}
+
+Write like a videographer who was actually there. Use plain, conversational British English. Short paragraphs. Short sentences. No em dashes. No words like stunning, magical, breathtaking, timeless, seamlessly, meticulously, nestled, or picturesque.
+
+MANDATORY STRUCTURE:
+
+1. JSON-LD SCHEMA BLOCK (output first, before any HTML)
+Output a <script type="application/ld+json"> block using VideoObject schema:
+{
+  "@context": "https://schema.org",
+  "@type": "VideoObject",
+  "name": "[generated YouTube title]",
+  "description": "[2-sentence summary of the film and venue]",
+  "thumbnailUrl": "PLACEHOLDER_THUMBNAIL_URL",
+  "uploadDate": "PLACEHOLDER_UPLOAD_DATE",
+  "author": {
+    "@type": "LocalBusiness",
+    "name": "${businessName}",
+    "url": "${businessUrl}"
+  },
+  "contentLocation": {
+    "@type": "Place",
+    "name": "${venueName}"
+  }
+}
+
+2. BLOG POST HTML
+
+<h1>: A plain, specific headline naming the venue. No clever wordplay.
+
+INTRODUCTION (2-3 sentences in a <p> tag): The first sentence must include the exact phrase "${venueName} wedding videographer". Summarise the post clearly. Name the venue, its location, and what made the day stand out. Write it so someone googling the venue gets a direct, useful answer.
+
+SEO KEYPHRASE: The target keyphrase is "${venueName} wedding videographer". Beyond the introduction, it must also appear naturally in at least one H2 or H3 heading, and in the meta description if an SEO plugin block is requested below.
+
+BODY SECTIONS using H2 headings phrased as questions couples actually search for:
+- "What is ${venueName} like as a wedding venue?"
+- "What is it like to film a wedding at ${venueName}?"
+- "Why do couples choose ${venueName}?"
+Use H3 sub-headings where they help. Keep paragraphs to 2-4 sentences. Reference the venue's county or region where you can. Use specific details from the questionnaire — real moments, not generic descriptions.
+
+CALL TO ACTION — one final <p> with one <strong> phrase: Keep it short and genuine. One or two sentences. Not salesy.
+
+3. FAQ SECTION
+<h2>Frequently Asked Questions about Weddings at ${venueName}</h2>
+
+3-4 Q&As using <h3> for questions and <p> for answers. Base answers on the questionnaire details. If you don't know something like guest numbers, write around it rather than making it up.
+
+OUTBOUND LINK: ${venueAnswers.venueWebsite ? `Include one natural outbound link to the venue's own website (${venueAnswers.venueWebsite}). Use the venue name "${venueName}" as the anchor text. Place it where it reads naturally in context — do not force it.` : "No venue website has been provided, so do not invent or guess a URL."}
+
+HTML tags allowed: <script> (JSON-LD only), <h1>, <h2>, <h3>, <p>, <strong>, <a> (for the venue outbound link only). No <html>, <body>, or <head> tags.
+${seoSection}
+Return ONLY the JSON-LD block followed by the blog post HTML.`);
       setBlogContent(blog.trim());
+
+      // Save history entry immediately — before any publish attempt
+      try {
+        const { data: post } = await supabase.from("posts").insert([{
+          user_id: user.id,
+          venue_name: venueName,
+          youtube_title: title.trim(),
+          youtube_description: desc.trim(),
+          blog_content: blog.trim(),
+          status: "draft",
+        }]).select().single();
+        if (post?.id) setSavedPostId(post.id);
+      } catch (e) {
+        console.error("Failed to save post history:", e.message);
+      }
 
       setStep(3);
     } catch (e) {
@@ -128,6 +212,32 @@ Slug: [url-friendly, lowercase, hyphens, no domain]
           const post = await res.json();
           wp = { success: true, editUrl: `${user.wp_url}/wp-admin/post.php?post=${post.id}&action=edit` };
           wpPostIdRef.current = post.id;
+
+          // Upload hero image as WordPress featured media
+          if (heroImage) {
+            try {
+              setLoadingMsg("Setting featured image...");
+              const mediaRes = await fetch(`${user.wp_url}/wp-json/wp/v2/media`, {
+                method: "POST",
+                headers: {
+                  Authorization: `Basic ${creds}`,
+                  "Content-Type": heroImage.type,
+                  "Content-Disposition": `attachment; filename="${heroImage.name}"`,
+                },
+                body: heroImage,
+              });
+              if (mediaRes.ok) {
+                const media = await mediaRes.json();
+                await fetch(`${user.wp_url}/wp-json/wp/v2/posts/${post.id}`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", Authorization: `Basic ${creds}` },
+                  body: JSON.stringify({ featured_media: media.id }),
+                });
+              }
+            } catch (e) {
+              console.error("Failed to set WordPress featured image:", e.message);
+            }
+          }
         }
       } catch (e) {
         wp = { success: false, error: e.message };
@@ -152,20 +262,16 @@ Slug: [url-friendly, lowercase, hyphens, no domain]
       }
     }
 
-    // 3. Save post record to Supabase
-    try {
-      const { data: post } = await supabase.from("posts").insert([{
-        user_id: user.id,
-        venue_name: venueName,
-        youtube_title: youtubeTitle,
-        youtube_description: youtubeDesc,
-        blog_content: blogContent,
-        wp_edit_url: wp?.editUrl || null,
-        status: uploadUri ? "uploading" : "published",
-      }]).select().single();
-      if (post?.id) setSavedPostId(post.id);
-    } catch (e) {
-      console.error("Failed to save post:", e.message);
+    // 3. Update the existing history entry with publish results
+    if (savedPostId) {
+      try {
+        await supabase.from("posts").update({
+          wp_edit_url: wp?.editUrl || null,
+          status: uploadUri ? "uploading" : "published",
+        }).eq("id", savedPostId);
+      } catch (e) {
+        console.error("Failed to update post:", e.message);
+      }
     }
 
     setWpResult(wp);
@@ -212,6 +318,29 @@ Slug: [url-friendly, lowercase, hyphens, no domain]
                   youtube_url: youtubeUrl,
                   status: "published",
                 }).eq("id", savedPostId);
+              }
+
+              // Set YouTube thumbnail
+              if (heroImageRef.current) {
+                try {
+                  const arrayBuffer = await heroImageRef.current.arrayBuffer();
+                  const bytes = new Uint8Array(arrayBuffer);
+                  let binary = "";
+                  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+                  const imageBase64 = btoa(binary);
+                  await fetch("/api/youtube-thumbnail", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      videoId: data.videoId,
+                      refreshToken: user.youtube_refresh_token,
+                      imageBase64,
+                      mimeType: heroImageRef.current.type,
+                    }),
+                  });
+                } catch (e) {
+                  console.error("YouTube thumbnail failed:", e.message);
+                }
               }
 
               // Inject YouTube embed into the WordPress draft
@@ -333,6 +462,42 @@ Slug: [url-friendly, lowercase, hyphens, no domain]
                   )}
                 </div>
               ))}
+              <div className="field" style={{ marginTop: 24 }}>
+                <label className="label">
+                  Hero Image <span className="label-hint">(used as YouTube thumbnail and blog featured image)</span>
+                </label>
+                <div
+                  className={`hero-image-picker ${heroImage ? "has-image" : ""}`}
+                  onClick={() => document.getElementById("heroImageInput").click()}
+                >
+                  <input
+                    id="heroImageInput"
+                    type="file"
+                    accept=".jpg,.jpeg,.png"
+                    hidden
+                    onChange={handleHeroImageSelect}
+                  />
+                  {heroImagePreview ? (
+                    <img src={heroImagePreview} alt="Hero preview" className="hero-image-preview" />
+                  ) : (
+                    <div className="hero-image-placeholder">
+                      <Icon.Upload />
+                      <span>Click to upload JPG or PNG</span>
+                    </div>
+                  )}
+                </div>
+                {heroImage && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    style={{ marginTop: 8, fontSize: 12, padding: "4px 10px" }}
+                    onClick={(e) => { e.stopPropagation(); if (heroImagePreview) URL.revokeObjectURL(heroImagePreview); setHeroImage(null); setHeroImagePreview(null); }}
+                  >
+                    Remove image
+                  </button>
+                )}
+              </div>
+
               <div style={{ display: "flex", gap: 12, marginTop: 32 }}>
                 <button className="btn btn-secondary" onClick={() => setStep(1)}>Back</button>
                 <button className="btn btn-primary btn-lg" disabled={!venueName} onClick={generateContent}>
@@ -449,7 +614,7 @@ Slug: [url-friendly, lowercase, hyphens, no domain]
                   ) : null}
                 </div>
 
-                <button className="btn btn-primary" style={{ marginTop: 32 }} onClick={() => { setStep(1); setFile(null); setVenueName(""); setVenueAnswers({}); setYoutubeTitle(""); setYoutubeDesc(""); setBlogContent(""); setWpResult(null); setYtUploadUri(null); setYtUpload({ state: "idle", progress: 0, videoId: null, error: null }); ytUploadStarted.current = false; wpPostIdRef.current = null; blogContentRef.current = ""; }}>
+                <button className="btn btn-primary" style={{ marginTop: 32 }} onClick={() => { setStep(1); setFile(null); setVenueName(""); setVenueAnswers({}); setYoutubeTitle(""); setYoutubeDesc(""); setBlogContent(""); setWpResult(null); setYtUploadUri(null); setYtUpload({ state: "idle", progress: 0, videoId: null, error: null }); ytUploadStarted.current = false; wpPostIdRef.current = null; blogContentRef.current = ""; if (heroImagePreview) URL.revokeObjectURL(heroImagePreview); setHeroImage(null); setHeroImagePreview(null); heroImageRef.current = null; setSavedPostId(null); }}>
                   + New Film
                 </button>
               </div>

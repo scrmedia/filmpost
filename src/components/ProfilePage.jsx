@@ -28,6 +28,7 @@ export function ProfilePage({ user, onUpdate }) {
     tone_of_voice: user?.tone_of_voice || "",
     seo_plugin: user?.seo_plugin || "",
     platform: user?.platform || "",
+    featured_opt_in: user?.featured_opt_in || false,
   });
   // Keep form in sync if parent re-renders with updated user data
   useEffect(() => {
@@ -42,6 +43,7 @@ export function ProfilePage({ user, onUpdate }) {
       tone_of_voice: user?.tone_of_voice || "",
       seo_plugin: user?.seo_plugin || "",
       platform: user?.platform || "",
+      featured_opt_in: user?.featured_opt_in || false,
     });
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -128,6 +130,28 @@ export function ProfilePage({ user, onUpdate }) {
                 </select>
               </div>
             </div>
+          </div>
+        </div>
+
+        <div className="card" style={{ marginTop: 24 }}>
+          <div className="card-header">
+            <h3 className="card-title">Community &amp; Visibility</h3>
+          </div>
+          <div className="card-body">
+            <label className="featured-opt-in-label">
+              <input
+                type="checkbox"
+                className="featured-opt-in-checkbox"
+                checked={form.featured_opt_in}
+                onChange={e => update("featured_opt_in", e.target.checked)}
+              />
+              <div className="featured-opt-in-text">
+                <span className="featured-opt-in-heading">Feature my films on the FilmPost homepage</span>
+                <span className="featured-opt-in-desc">
+                  Allow a randomly selected film from my portfolio to play as a background video on the login screen, alongside my business name.
+                </span>
+              </div>
+            </label>
           </div>
         </div>
       </div>

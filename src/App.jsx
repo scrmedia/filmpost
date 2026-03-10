@@ -105,7 +105,7 @@ export default function App() {
         <main className="main-content">
           {page === "dashboard" && <Dashboard user={user} posts={posts} setPage={setPage} />}
           {page === "upload" && <UploadPage user={user} onSuccess={() => loadPosts(user.id)} />}
-          {page === "history" && <HistoryPage posts={posts} />}
+          {page === "history" && <HistoryPage posts={posts} user={user} />}
           {page === "settings" && <SettingsPage user={user} onSaveUser={saveUser} />}
           {page === "profile" && <ProfilePage user={user} onUpdate={saveUser} />}
         </main>
