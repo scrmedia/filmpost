@@ -34,7 +34,9 @@ export default async function handler(req, res) {
       });
       const tokenData = await tokenResponse.json();
       if (!tokenResponse.ok || tokenData.error) {
-        throw new Error(tokenData.error_description || tokenData.error || 'Token exchange failed');
+        const msg = [tokenData.error, tokenData.error_description, `(HTTP ${tokenResponse.status})`]
+          .filter(Boolean).join(' — ');
+        throw new Error(msg || 'Token exchange failed');
       }
       const { access_token, refresh_token } = tokenData;
 
