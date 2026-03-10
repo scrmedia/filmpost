@@ -29,12 +29,12 @@ export default function App() {
   }, []);
 
   const loadPosts = async (userId) => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("posts")
       .select("*")
       .eq("user_id", userId)
       .order("created_at", { ascending: false });
-    setPosts(data || []);
+    if (!error) setPosts(data || []);
   };
 
   const handleLogin = (u) => {

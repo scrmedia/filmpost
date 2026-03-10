@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Icon } from "../icons";
 import { supabase } from "../utils";
 import { BusinessProfileFields } from "./BusinessProfileFields";
@@ -13,6 +13,19 @@ export function ProfilePage({ user, onUpdate }) {
     tiktok: user?.tiktok || "",
     facebook: user?.facebook || "",
   });
+  // Keep form in sync if parent re-renders with updated user data
+  useEffect(() => {
+    setForm({
+      business_name: user?.business_name || "",
+      tagline: user?.tagline || "",
+      enquiry_email: user?.enquiry_email || "",
+      website: user?.website || "",
+      instagram: user?.instagram || "",
+      tiktok: user?.tiktok || "",
+      facebook: user?.facebook || "",
+    });
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");

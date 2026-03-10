@@ -1,9 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "../utils";
 import { Icon } from "../icons";
 
 export function SettingsPage({ user, onSaveUser }) {
   const [wpForm, setWpForm] = useState({ wp_url: user?.wp_url || "", wp_user: user?.wp_user || "", wp_pass: user?.wp_pass || "" });
+  // Keep form in sync if parent user prop changes (e.g. after OAuth callback)
+  useEffect(() => {
+    setWpForm({ wp_url: user?.wp_url || "", wp_user: user?.wp_user || "", wp_pass: user?.wp_pass || "" });
+  }, [user?.wp_url, user?.wp_user, user?.wp_pass]); // eslint-disable-line react-hooks/exhaustive-deps
   const [wpOpen, setWpOpen] = useState(false);
   const [wpLoading, setWpLoading] = useState(false);
   const [wpError, setWpError] = useState("");
@@ -32,9 +36,9 @@ export function SettingsPage({ user, onSaveUser }) {
   };
 
   const disconnectYouTube = async () => {
-    const updated = { ...user, youtube_access_token: null, youtube_refresh_token: null, youtube_channel_name: null };
-    await supabase.from("users").update({ youtube_access_token: null, youtube_refresh_token: null, youtube_channel_name: null }).eq("id", user.id);
-    onSaveUser(updated);
+    const { error } = await supabase.from("users").update({ youtube_access_token: null, youtube_refresh_token: null, youtube_channel_name: null }).eq("id", user.id);
+    if (error) { setYtError(error.message); return; }
+    onSaveUser({ ...user, youtube_access_token: null, youtube_refresh_token: null, youtube_channel_name: null });
   };
 
   const saveWordPress = async (e) => {
@@ -61,7 +65,8 @@ export function SettingsPage({ user, onSaveUser }) {
   };
 
   const disconnectWordPress = async () => {
-    await supabase.from("users").update({ wp_url: null, wp_user: null, wp_pass: null }).eq("id", user.id);
+    const { error } = await supabase.from("users").update({ wp_url: null, wp_user: null, wp_pass: null }).eq("id", user.id);
+    if (error) { setWpError(error.message); return; }
     onSaveUser({ ...user, wp_url: null, wp_user: null, wp_pass: null });
     setWpForm({ wp_url: "", wp_user: "", wp_pass: "" });
   };
