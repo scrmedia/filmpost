@@ -12,7 +12,7 @@ export default async function handler(req, res) {
         client_id: process.env.YOUTUBE_CLIENT_ID,
         redirect_uri: process.env.YOUTUBE_REDIRECT_URI,
         response_type: 'code',
-        scope: 'https://www.googleapis.com/auth/youtube.upload',
+        scope: 'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly',
         access_type: 'offline',
         prompt: 'consent',
       });
@@ -38,15 +38,15 @@ export default async function handler(req, res) {
       }
       const { access_token, refresh_token } = tokenData;
 
-      const channelResponse = await fetch(
-        'https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true',
-        {
-          headers: { Authorization: `Bearer ${access_token}` },
-        }
-      );
-      const channelData = await channelResponse.json();
-      const channel_name =
-        channelData.items?.[0]?.snippet?.title || 'YouTube Channel';
+      let channel_name = 'YouTube Channel';
+      try {
+        const channelResponse = await fetch(
+          'https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true',
+          { headers: { Authorization: `Bearer ${access_token}` } }
+        );
+        const channelData = await channelResponse.json();
+        channel_name = channelData.items?.[0]?.snippet?.title || 'YouTube Channel';
+      } catch (_) { /* channel name is non-critical, use fallback */ }
 
       return res.status(200).json({ access_token, refresh_token, channel_name });
     }
