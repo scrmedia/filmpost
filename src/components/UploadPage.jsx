@@ -50,7 +50,7 @@ export function UploadPage({ user, onSuccess }) {
       const toneInstruction = user?.tone_of_voice
         ? `\n\nWrite in a style that reflects this brand voice: ${user.tone_of_voice}`
         : "";
-      const systemPrompt = `You are an expert copywriter for luxury UK wedding videographers. Write in elegant British English, using evocative but authentic language. Avoid clichés and overly salesy phrasing. Focus on emotion, atmosphere, and the couple's story.${toneInstruction}`;
+      const systemPrompt = `You are a specialist wedding editorial writer and SEO/GEO strategist for luxury UK wedding videographers. Write with the warm authority of a knowledgeable wedding journalist — specific, vivid, and grounded in real detail. Never write generically. Every post must be optimised for both traditional search engines and AI-powered search (Google SGE, ChatGPT, Perplexity): use clear structure, direct answers to real questions, and rich semantic context drawn from the specific venue and wedding details provided. Write in elegant British English.${toneInstruction}`;
       const answersText = VENUE_QUESTIONS.map(q => venueAnswers[q.id] ? `${q.label}: ${venueAnswers[q.id]}` : "").filter(Boolean).join("\n");
 
       const title = await callClaude(systemPrompt, `Create a YouTube title for a wedding film at "${venueName}". Elegant, include venue name, under 70 characters. Return ONLY the title, no quotes.`);
@@ -93,7 +93,77 @@ Slug: [url-friendly, lowercase, hyphens, no domain]
 <!-- END ALL IN ONE SEO -->`
         : "";
 
-      const blog = await callClaude(systemPrompt, `Write an 800-1200 word blog post about filming a wedding at "${venueName}" for a wedding videographer's website.\n\n${answersText}\n\nStructure: compelling headline, immersive opening, sections on venue/atmosphere/filming highlights, subtle CTA. Use HTML: <h2>, <p>, <strong>.${seoSection}\n\nReturn ONLY the HTML (and the SEO block if requested, as plain text after the HTML).`);
+      const businessName = user?.business_name || "the videographer";
+      const businessUrl = user?.website || "";
+      const blog = await callClaude(systemPrompt, `Write an SEO and GEO-optimised blog post (900–1200 words) for a wedding videographer's website about filming a wedding at "${venueName}".
+
+${answersText}
+
+MANDATORY STRUCTURE — follow every section exactly:
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. JSON-LD SCHEMA BLOCK (output FIRST, before any HTML)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Output a <script type="application/ld+json"> block using VideoObject schema:
+{
+  "@context": "https://schema.org",
+  "@type": "VideoObject",
+  "name": "[generated YouTube title]",
+  "description": "[2-sentence summary of the film and venue]",
+  "thumbnailUrl": "PLACEHOLDER_THUMBNAIL_URL",
+  "uploadDate": "PLACEHOLDER_UPLOAD_DATE",
+  "author": {
+    "@type": "LocalBusiness",
+    "name": "${businessName}",
+    "url": "${businessUrl}"
+  },
+  "contentLocation": {
+    "@type": "Place",
+    "name": "${venueName}"
+  }
+}
+If the venue location can be established from the questionnaire details, add a "address" field under contentLocation with the town/county.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2. BLOG POST HTML (immediately after the schema block)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+<h1>: A specific, descriptive headline naming the venue and the couple's experience — naturally addressing "What is it like to get married at ${venueName}?"
+
+INTRODUCTION — 2 to 3 sentences in a <p> tag:
+Write a concise summary of the entire post that an AI assistant could use as a standalone snippet. Name the venue, its county or region, and the essence of what made the day special. This paragraph must answer the implicit question: "What is it like to have your wedding filmed at ${venueName}?"
+
+BODY SECTIONS — use H2 headings phrased as direct questions couples search for, e.g.:
+- "What Makes ${venueName} Such a Magical Wedding Venue?"
+- "What is it Like to Film a Wedding at ${venueName}?"
+- "Why Do Couples Choose ${venueName} for Their Wedding Day?"
+Use H3 sub-headings within sections where natural. Write in short, scannable paragraphs — 2 to 4 sentences maximum. No walls of text.
+
+SPECIFICITY REQUIREMENTS (critical for AI search weighting):
+- Reference the full, correct venue name throughout
+- Include the county or region (e.g. "Warwickshire", "The Cotswolds", "the Surrey Hills") wherever it can be established from the venue name or questionnaire answers
+- Weave in real moments and specific details from the questionnaire answers above — AI models weight specific, verifiable content far more highly than generic descriptions
+- Naturally include semantically related terms appropriate to this venue type (e.g. for a barn: "rustic", "countryside ceremony", "natural light", "relaxed atmosphere"; for a stately home: "grand", "formal gardens", "period architecture", "timeless elegance") — never force terms that don't fit
+
+CALL TO ACTION — one final <p> with one <strong> phrase:
+A natural editorial sign-off inviting enquiries — warm and specific, not a sales pitch.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3. FAQ SECTION (required — appears at end of post, before any SEO plugin block)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+<h2>Frequently Asked Questions about Weddings at ${venueName}</h2>
+
+Write 3 to 4 Q&A pairs using <h3> for each question and <p> for each answer. Choose questions that real couples search for and that AI assistants pull from FAQ content, such as:
+- "What is ${venueName} like as a wedding venue?"
+- "How many guests can ${venueName} accommodate?"
+- "Is ${venueName} suitable for wedding photography and film?"
+- "Where exactly is ${venueName} located?"
+Derive all answers from the questionnaire details; be specific and factual. Do not make up guest numbers or details not provided — write around them naturally if unknown.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+HTML TAGS: <script> (JSON-LD only), <h1>, <h2>, <h3>, <p>, <strong>. No <html>, <body>, or <head> tags.
+${seoSection}
+Return ONLY the JSON-LD <script> block followed immediately by the blog post HTML (and the SEO plugin block if requested, as plain text after the HTML).`);
       setBlogContent(blog.trim());
 
       setStep(3);
