@@ -147,6 +147,21 @@ ${seoSection}
 Return ONLY the JSON-LD block followed by the blog post HTML.`);
       setBlogContent(blog.trim());
 
+      // Save history entry immediately — before any publish attempt
+      try {
+        const { data: post } = await supabase.from("posts").insert([{
+          user_id: user.id,
+          venue_name: venueName,
+          youtube_title: title.trim(),
+          youtube_description: desc.trim(),
+          blog_content: blog.trim(),
+          status: "draft",
+        }]).select().single();
+        if (post?.id) setSavedPostId(post.id);
+      } catch (e) {
+        console.error("Failed to save post history:", e.message);
+      }
+
       setStep(3);
     } catch (e) {
       setError(e.message);
@@ -203,20 +218,16 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
       }
     }
 
-    // 3. Save post record to Supabase
-    try {
-      const { data: post } = await supabase.from("posts").insert([{
-        user_id: user.id,
-        venue_name: venueName,
-        youtube_title: youtubeTitle,
-        youtube_description: youtubeDesc,
-        blog_content: blogContent,
-        wp_edit_url: wp?.editUrl || null,
-        status: uploadUri ? "uploading" : "published",
-      }]).select().single();
-      if (post?.id) setSavedPostId(post.id);
-    } catch (e) {
-      console.error("Failed to save post:", e.message);
+    // 3. Update the existing history entry with publish results
+    if (savedPostId) {
+      try {
+        await supabase.from("posts").update({
+          wp_edit_url: wp?.editUrl || null,
+          status: uploadUri ? "uploading" : "published",
+        }).eq("id", savedPostId);
+      } catch (e) {
+        console.error("Failed to update post:", e.message);
+      }
     }
 
     setWpResult(wp);
