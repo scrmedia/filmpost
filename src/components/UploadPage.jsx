@@ -141,7 +141,9 @@ Output a <script type="application/ld+json"> block using VideoObject schema:
 
 <h1>: A plain, specific headline naming the venue. No clever wordplay.
 
-INTRODUCTION (2-3 sentences in a <p> tag): Summarise the post clearly. Name the venue, its location, and what made the day stand out. Write it so someone googling the venue gets a direct, useful answer.
+INTRODUCTION (2-3 sentences in a <p> tag): The first sentence must include the exact phrase "${venueName} wedding videographer". Summarise the post clearly. Name the venue, its location, and what made the day stand out. Write it so someone googling the venue gets a direct, useful answer.
+
+SEO KEYPHRASE: The target keyphrase is "${venueName} wedding videographer". Beyond the introduction, it must also appear naturally in at least one H2 or H3 heading, and in the meta description if an SEO plugin block is requested below.
 
 BODY SECTIONS using H2 headings phrased as questions couples actually search for:
 - "What is ${venueName} like as a wedding venue?"
@@ -156,7 +158,9 @@ CALL TO ACTION — one final <p> with one <strong> phrase: Keep it short and gen
 
 3-4 Q&As using <h3> for questions and <p> for answers. Base answers on the questionnaire details. If you don't know something like guest numbers, write around it rather than making it up.
 
-HTML tags allowed: <script> (JSON-LD only), <h1>, <h2>, <h3>, <p>, <strong>. No <html>, <body>, or <head> tags.
+OUTBOUND LINK: ${venueAnswers.venueWebsite ? `Include one natural outbound link to the venue's own website (${venueAnswers.venueWebsite}). Use the venue name "${venueName}" as the anchor text. Place it where it reads naturally in context — do not force it.` : "No venue website has been provided, so do not invent or guess a URL."}
+
+HTML tags allowed: <script> (JSON-LD only), <h1>, <h2>, <h3>, <p>, <strong>, <a> (for the venue outbound link only). No <html>, <body>, or <head> tags.
 ${seoSection}
 Return ONLY the JSON-LD block followed by the blog post HTML.`);
       setBlogContent(blog.trim());
