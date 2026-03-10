@@ -15,22 +15,23 @@ export function ProfilePage({ user, onUpdate }) {
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
 
   const update = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const handleSave = async () => {
-    setSaving(true);
+    setSaving(true); setError("");
     try {
-      const { error } = await supabase
+      const { error: err } = await supabase
         .from("users")
         .update(form)
         .eq("id", user.id);
-      if (error) throw error;
+      if (err) throw new Error(err.message);
       onUpdate?.({ ...user, ...form });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (e) {
-      console.error(e);
+      setError(e.message);
     } finally {
       setSaving(false);
     }
@@ -56,6 +57,7 @@ export function ProfilePage({ user, onUpdate }) {
             <h3 className="card-title">Business Details</h3>
           </div>
           <div className="card-body">
+            {error && <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div>}
             <div className="field">
               <label className="label">Business Name</label>
               <input className="input" value={form.business_name} onChange={e => update("business_name", e.target.value)} />
