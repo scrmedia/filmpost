@@ -138,8 +138,17 @@ export function Dashboard({ user, posts, setPage }) {
                 <div className="quick-action-icon">
                   <Icon.YouTube />
                 </div>
-                <h4 className="quick-action-title">Connect YouTube</h4>
-                <p className="quick-action-desc">Link your YouTube channel to enable direct publishing.</p>
+                {user?.youtube_access_token ? (
+                  <>
+                    <h4 className="quick-action-title">YouTube Connected</h4>
+                    <p className="quick-action-desc">{user.youtube_channel_name || "Channel connected"} — manage in Settings.</p>
+                  </>
+                ) : (
+                  <>
+                    <h4 className="quick-action-title">Connect YouTube</h4>
+                    <p className="quick-action-desc">Link your YouTube channel to enable direct publishing.</p>
+                  </>
+                )}
               </div>
             </div>
           </div>
