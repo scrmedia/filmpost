@@ -2,7 +2,7 @@ import { Icon } from "../icons";
 
 export function Dashboard({ user, posts, setPage }) {
   const totalVideos = posts?.length || 0;
-  const totalBlogs = posts?.filter(p => p.wordpress_url)?.length || 0;
+  const totalBlogs = posts?.filter(p => p.wp_edit_url)?.length || 0;
   const thisMonth = posts?.filter(p => {
     const d = new Date(p.created_at);
     const now = new Date();
@@ -21,11 +21,23 @@ export function Dashboard({ user, posts, setPage }) {
 
   const recentPosts = posts?.slice(0, 5) || [];
 
-  const activities = [
-    { icon: "success", text: "Video published to YouTube", time: "2 hours ago" },
-    { icon: "success", text: "Blog post created on WordPress", time: "2 hours ago" },
-    { icon: "default", text: "New upload started", time: "3 hours ago" },
-  ];
+  // Build activity feed from real post data
+  const activities = (posts || []).slice(0, 5).flatMap(p => {
+    const date = new Date(p.created_at);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const timeAgo = diffMins < 60
+      ? `${diffMins}m ago`
+      : diffMins < 1440
+        ? `${Math.floor(diffMins / 60)}h ago`
+        : `${Math.floor(diffMins / 1440)}d ago`;
+    const events = [];
+    if (p.youtube_url) events.push({ icon: "success", text: `Video uploaded — ${p.venue_name || "Untitled"}`, time: timeAgo });
+    if (p.wp_edit_url) events.push({ icon: "success", text: `Blog draft created — ${p.venue_name || "Untitled"}`, time: timeAgo });
+    if (!p.youtube_url && !p.wp_edit_url) events.push({ icon: "default", text: `Content generated — ${p.venue_name || "Untitled"}`, time: timeAgo });
+    return events;
+  }).slice(0, 5);
 
   return (
     <>
@@ -169,7 +181,7 @@ export function Dashboard({ user, posts, setPage }) {
                 <h3 className="card-title">Recent Activity</h3>
               </div>
               <div className="card-body">
-                {activities.map((activity, i) => (
+                {activities.length > 0 ? activities.map((activity, i) => (
                   <div key={i} className="activity-item">
                     <div className={`activity-icon ${activity.icon}`}>
                       <Icon.Check />
@@ -179,7 +191,9 @@ export function Dashboard({ user, posts, setPage }) {
                       <span className="activity-time">{activity.time}</span>
                     </div>
                   </div>
-                ))}
+                )) : (
+                  <p style={{ color: "var(--text-muted)", fontSize: 14, margin: 0 }}>No activity yet — publish your first film to get started.</p>
+                )}
               </div>
             </div>
           </div>
