@@ -8,7 +8,17 @@ export function Dashboard({ user, posts, setPage }) {
     const now = new Date();
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   })?.length || 0;
-  
+
+  const publishedCount = posts?.filter(p => p.status === "published").length || 0;
+  const minutesSaved = publishedCount * 60;
+  const timeSavedDisplay = minutesSaved === 0
+    ? null
+    : minutesSaved < 60
+      ? `${minutesSaved}m`
+      : minutesSaved % 60 === 0
+        ? `${minutesSaved / 60}h`
+        : `${Math.floor(minutesSaved / 60)}h ${minutesSaved % 60}m`;
+
   const recentPosts = posts?.slice(0, 5) || [];
 
   const activities = [
@@ -72,11 +82,11 @@ export function Dashboard({ user, posts, setPage }) {
           <div className="stat-card">
             <div className="stat-header">
               <div className="stat-icon">
-                <Icon.TrendUp />
+                <Icon.History />
               </div>
             </div>
-            <div className="stat-value">{Math.round(totalVideos / Math.max(1, 3))}x</div>
-            <div className="stat-label">Avg. per Month</div>
+            <div className="stat-value">{timeSavedDisplay || "—"}</div>
+            <div className="stat-label">Time Saved</div>
           </div>
         </div>
         
