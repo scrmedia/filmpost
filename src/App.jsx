@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
+import bcrypt from "bcryptjs";
 
 // ── Supabase client ───────────────────────────────────────────────────────────
 const supabase = createClient(
@@ -241,8 +242,9 @@ function Onboarding({ onComplete }) {
       const { data: existing } = await supabase.from("users").select("id").eq("email", form.email).single();
       if (existing) { setError("An account with that email already exists"); setLoading(false); return; }
 
+      const hashedPassword = await bcrypt.hash(form.password, 10);
       const { data, error: insertError } = await supabase.from("users").insert([{
-        email: form.email, password: form.password, name: form.name,
+        email: form.email, password: hashedPassword, name: form.name,
         business_name: form.business_name, tagline: form.tagline,
         enquiry_email: form.enquiry_email, website: form.website,
         instagram: form.instagram.replace(/^@/, ""),
@@ -343,8 +345,8 @@ function Login({ onLogin, onRegister }) {
   const login = async () => {
     setLoading(true); setError("");
     try {
-      const { data, error: dbError } = await supabase.from("users").select("*").eq("email", form.email).eq("password", form.password).single();
-      if (dbError || !data) { setError("Incorrect email or password"); setLoading(false); return; }
+      const { data, error: dbError } = await supabase.from("users").select("*").eq("email", form.email).single();
+      if (dbError || !data || !(await bcrypt.compare(form.password, data.password))) { setError("Incorrect email or password"); setLoading(false); return; }
       localStorage.setItem("filmpost_session", JSON.stringify({ userId: data.id, email: data.email }));
       onLogin(data);
     } catch (e) { setError("Something went wrong"); }
