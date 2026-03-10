@@ -3,6 +3,19 @@ import { Icon } from "../icons";
 import { supabase } from "../utils";
 import { BusinessProfileFields } from "./BusinessProfileFields";
 
+const SEO_PLUGINS = [
+  { value: "", label: "None / not sure" },
+  { value: "yoast", label: "Yoast SEO" },
+  { value: "rankmath", label: "Rank Math" },
+  { value: "aioseo", label: "All in One SEO" },
+];
+
+const PLATFORMS = [
+  { value: "", label: "Select platform…" },
+  { value: "wordpress", label: "WordPress" },
+  { value: "squarespace", label: "Squarespace" },
+];
+
 export function ProfilePage({ user, onUpdate }) {
   const [form, setForm] = useState({
     business_name: user?.business_name || "",
@@ -12,6 +25,9 @@ export function ProfilePage({ user, onUpdate }) {
     instagram: user?.instagram || "",
     tiktok: user?.tiktok || "",
     facebook: user?.facebook || "",
+    tone_of_voice: user?.tone_of_voice || "",
+    seo_plugin: user?.seo_plugin || "",
+    platform: user?.platform || "",
   });
   // Keep form in sync if parent re-renders with updated user data
   useEffect(() => {
@@ -23,6 +39,9 @@ export function ProfilePage({ user, onUpdate }) {
       instagram: user?.instagram || "",
       tiktok: user?.tiktok || "",
       facebook: user?.facebook || "",
+      tone_of_voice: user?.tone_of_voice || "",
+      seo_plugin: user?.seo_plugin || "",
+      platform: user?.platform || "",
     });
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -76,6 +95,39 @@ export function ProfilePage({ user, onUpdate }) {
               <input className="input" value={form.business_name} onChange={e => update("business_name", e.target.value)} />
             </div>
             <BusinessProfileFields form={form} update={update} />
+          </div>
+        </div>
+
+        <div className="card" style={{ marginTop: 24 }}>
+          <div className="card-header">
+            <h3 className="card-title">Content Preferences</h3>
+          </div>
+          <div className="card-body">
+            <div className="field">
+              <label className="label">Tone of Voice <span className="label-hint">(optional)</span></label>
+              <textarea
+                className="input"
+                rows={3}
+                value={form.tone_of_voice}
+                onChange={e => update("tone_of_voice", e.target.value)}
+                placeholder="e.g. Warm and romantic, cinematic storytelling with a personal touch. Avoid corporate language."
+              />
+              <p className="form-hint">Used by AI when generating YouTube descriptions and blog posts.</p>
+            </div>
+            <div className="grid-2">
+              <div className="field">
+                <label className="label">Publishing Platform</label>
+                <select className="input" value={form.platform} onChange={e => update("platform", e.target.value)}>
+                  {PLATFORMS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                </select>
+              </div>
+              <div className="field">
+                <label className="label">SEO Plugin <span className="label-hint">(WordPress only)</span></label>
+                <select className="input" value={form.seo_plugin} onChange={e => update("seo_plugin", e.target.value)}>
+                  {SEO_PLUGINS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                </select>
+              </div>
+            </div>
           </div>
         </div>
       </div>
