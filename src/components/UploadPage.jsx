@@ -23,8 +23,13 @@ export function UploadPage({ user, onSuccess }) {
   const [savedPostId, setSavedPostId] = useState(null);
 
   const ytUploadStarted = useRef(false);
+  const wpPostIdRef = useRef(null);       // WP post ID — needed by the upload useEffect
+  const blogContentRef = useRef("");      // current blogContent — needed by the upload useEffect
   const dropRef = useRef(null);
   const [dragOver, setDragOver] = useState(false);
+
+  // Keep ref in sync so the upload useEffect always reads the latest blog content
+  useEffect(() => { blogContentRef.current = blogContent; }, [blogContent]);
 
   // ── File handling ──────────────────────────────────────────────────────────
   const handleDrop = useCallback((e) => {
@@ -122,6 +127,7 @@ Slug: [url-friendly, lowercase, hyphens, no domain]
         } else {
           const post = await res.json();
           wp = { success: true, editUrl: `${user.wp_url}/wp-admin/post.php?post=${post.id}&action=edit` };
+          wpPostIdRef.current = post.id;
         }
       } catch (e) {
         wp = { success: false, error: e.message };
@@ -197,11 +203,30 @@ Slug: [url-friendly, lowercase, hyphens, no domain]
           if (data.complete && data.videoId) {
             if (!aborted) {
               setYtUpload({ state: "done", progress: 100, videoId: data.videoId, error: null });
+
+              const youtubeUrl = `https://www.youtube.com/watch?v=${data.videoId}`;
+
+              // Update Supabase post record
               if (savedPostId) {
                 await supabase.from("posts").update({
-                  youtube_url: `https://www.youtube.com/watch?v=${data.videoId}`,
+                  youtube_url: youtubeUrl,
                   status: "published",
                 }).eq("id", savedPostId);
+              }
+
+              // Inject YouTube embed into the WordPress draft
+              if (wpPostIdRef.current && user.wp_url && user.wp_user && user.wp_pass) {
+                const embed = `<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;">\n  <iframe src="https://www.youtube.com/embed/${data.videoId}" style="position:absolute;top:0;left:0;width:100%;height:100%;" frameborder="0" allowfullscreen></iframe>\n</div>`;
+                const content = blogContentRef.current;
+                const insertAt = content.indexOf("</p>");
+                const updatedContent = insertAt !== -1
+                  ? content.slice(0, insertAt + 4) + "\n\n" + embed + "\n\n" + content.slice(insertAt + 4)
+                  : embed + "\n\n" + content;
+                await fetch(`${user.wp_url}/wp-json/wp/v2/posts/${wpPostIdRef.current}`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", Authorization: `Basic ${btoa(`${user.wp_user}:${user.wp_pass}`)}` },
+                  body: JSON.stringify({ content: updatedContent }),
+                }).catch(() => {}); // Non-fatal — embed missing is better than breaking the upload flow
               }
             }
             return;
@@ -424,7 +449,7 @@ Slug: [url-friendly, lowercase, hyphens, no domain]
                   ) : null}
                 </div>
 
-                <button className="btn btn-primary" style={{ marginTop: 32 }} onClick={() => { setStep(1); setFile(null); setVenueName(""); setVenueAnswers({}); setYoutubeTitle(""); setYoutubeDesc(""); setBlogContent(""); setWpResult(null); setYtUploadUri(null); setYtUpload({ state: "idle", progress: 0, videoId: null, error: null }); ytUploadStarted.current = false; }}>
+                <button className="btn btn-primary" style={{ marginTop: 32 }} onClick={() => { setStep(1); setFile(null); setVenueName(""); setVenueAnswers({}); setYoutubeTitle(""); setYoutubeDesc(""); setBlogContent(""); setWpResult(null); setYtUploadUri(null); setYtUpload({ state: "idle", progress: 0, videoId: null, error: null }); ytUploadStarted.current = false; wpPostIdRef.current = null; blogContentRef.current = ""; }}>
                   + New Film
                 </button>
               </div>
