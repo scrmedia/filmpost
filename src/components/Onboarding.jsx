@@ -4,26 +4,27 @@ import { supabase } from "../utils";
 import { BusinessProfileFields } from "./BusinessProfileFields";
 
 export function Onboarding({ onComplete }) {
+  const [isLogin, setIsLogin] = useState(true);
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
     name: "", email: "", password: "", business_name: "",
-    tagline: "", enquiry_email: "", website: "", instagram: "", tiktok: "", facebook: ""
+    tagline: "", enquiry_email: "", website: "", instagram: "", tiktok: "", facebook: "",
+    wp_url: "", wp_user: "", wp_pass: "",
   });
+  const [createdUser, setCreatedUser] = useState(null); // set after account creation, used in step 3
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [wpSaved, setWpSaved] = useState(false);
+  const [ytLoading, setYtLoading] = useState(false);
 
   const update = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
+  // ── Login ──────────────────────────────────────────────────────────────────
   const handleLogin = async (e) => {
     e?.preventDefault();
-    setError("");
-    setLoading(true);
+    setError(""); setLoading(true);
     try {
-      const { data, error: err } = await supabase
-        .from("users")
-        .select("*")
-        .eq("email", form.email)
-        .single();
+      const { data, error: err } = await supabase.from("users").select("*").eq("email", form.email).single();
       if (err || !data) throw new Error("Invalid credentials");
       if (!data.password_hash) throw new Error("Account has no password set — please create a new account");
       const valid = await bcrypt.compare(form.password, data.password_hash);
@@ -36,37 +37,30 @@ export function Onboarding({ onComplete }) {
     }
   };
 
+  // ── Signup ─────────────────────────────────────────────────────────────────
   const handleSignup = async (e) => {
     e?.preventDefault();
-    setError("");
-    setLoading(true);
+    setError(""); setLoading(true);
     try {
       if (step === 1) {
         if (!form.name || !form.email || !form.password) throw new Error("All fields required");
-        setStep(2);
-        setLoading(false);
-        return;
+        setStep(2); setLoading(false); return;
       }
-      if (!form.business_name) throw new Error("Business name required");
-      const hash = await bcrypt.hash(form.password, 10);
-      const { data, error: err } = await supabase
-        .from("users")
-        .insert([{
-          name: form.name,
-          email: form.email,
-          password_hash: hash,
-          business_name: form.business_name,
-          tagline: form.tagline,
+      if (step === 2) {
+        if (!form.business_name) throw new Error("Business name required");
+        const hash = await bcrypt.hash(form.password, 10);
+        const { data, error: err } = await supabase.from("users").insert([{
+          name: form.name, email: form.email, password_hash: hash,
+          business_name: form.business_name, tagline: form.tagline,
           enquiry_email: form.enquiry_email || form.email,
-          website: form.website,
-          instagram: form.instagram,
-          tiktok: form.tiktok,
-          facebook: form.facebook,
-        }])
-        .select()
-        .single();
-      if (err) throw new Error(err.message);
-      onComplete(data);
+          website: form.website, instagram: form.instagram,
+          tiktok: form.tiktok, facebook: form.facebook,
+        }]).select().single();
+        if (err) throw new Error(err.message);
+        localStorage.setItem("filmpost_user", JSON.stringify(data));
+        setCreatedUser(data);
+        setStep(3); setLoading(false); return;
+      }
     } catch (e) {
       setError(e.message);
     } finally {
@@ -74,8 +68,49 @@ export function Onboarding({ onComplete }) {
     }
   };
 
-  const [isLogin, setIsLogin] = useState(true);
+  // ── WordPress save (step 3) ────────────────────────────────────────────────
+  const saveWordPress = async (e) => {
+    e.preventDefault();
+    setError(""); setLoading(true);
+    try {
+      const { wp_url, wp_user, wp_pass } = form;
+      if (!wp_url || !wp_user || !wp_pass) throw new Error("All WordPress fields required");
+      const cleanUrl = wp_url.replace(/\/$/, "");
+      const testRes = await fetch(`${cleanUrl}/wp-json/wp/v2/users/me`, {
+        headers: { Authorization: `Basic ${btoa(`${wp_user}:${wp_pass}`)}` },
+      });
+      if (!testRes.ok) throw new Error("Could not verify WordPress credentials");
+      const updated = { ...createdUser, wp_url: cleanUrl, wp_user, wp_pass };
+      await supabase.from("users").update({ wp_url: cleanUrl, wp_user, wp_pass }).eq("id", createdUser.id);
+      localStorage.setItem("filmpost_user", JSON.stringify(updated));
+      setCreatedUser(updated);
+      setWpSaved(true);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  // ── YouTube connect (step 3) ───────────────────────────────────────────────
+  const connectYouTube = async () => {
+    setYtLoading(true); setError("");
+    try {
+      const res = await fetch("/api/youtube-auth", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "getAuthUrl" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to get auth URL");
+      window.location.href = data.url;
+    } catch (e) {
+      setError(e.message); setYtLoading(false);
+    }
+  };
+
+  const finish = () => onComplete(createdUser);
+
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="onboarding-container">
       <div className="onboarding-card">
@@ -87,37 +122,79 @@ export function Onboarding({ onComplete }) {
         <div className="card">
           <div className="card-body">
             {isLogin ? (
+              /* ── Login form ── */
               <form onSubmit={handleLogin}>
                 <div className="field">
                   <label className="label">Email</label>
-                  <input 
-                    className="input" 
-                    type="email" 
-                    value={form.email} 
-                    onChange={e => update("email", e.target.value)} 
-                    placeholder="you@example.com" 
-                  />
+                  <input className="input" type="email" value={form.email} onChange={e => update("email", e.target.value)} placeholder="you@example.com" />
                 </div>
                 <div className="field">
                   <label className="label">Password</label>
-                  <input 
-                    className="input" 
-                    type="password" 
-                    value={form.password} 
-                    onChange={e => update("password", e.target.value)} 
-                    placeholder="Enter your password" 
-                  />
+                  <input className="input" type="password" value={form.password} onChange={e => update("password", e.target.value)} placeholder="Enter your password" />
                 </div>
                 {error && <div className="alert alert-error">{error}</div>}
                 <button className="btn btn-primary btn-lg" style={{ width: "100%" }} disabled={loading}>
                   {loading ? <span className="spinner"></span> : "Sign In"}
                 </button>
               </form>
+            ) : step === 3 ? (
+              /* ── Step 3: Connect integrations ── */
+              <div>
+                <div className="onboarding-step">Step 3 of 3</div>
+                <h3 style={{ marginBottom: 8, fontSize: 22 }}>Connect your integrations</h3>
+                <p style={{ color: "var(--text-muted)", fontSize: 14, marginBottom: 24 }}>
+                  Connect your publishing channels. You can also do this later in Settings.
+                </p>
+
+                {/* WordPress */}
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                    <span className="label" style={{ marginBottom: 0 }}>WordPress Site</span>
+                    {wpSaved && <span style={{ color: "var(--success)", fontSize: 13 }}>✓ Connected</span>}
+                  </div>
+                  {!wpSaved ? (
+                    <form onSubmit={saveWordPress} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      <input className="input" placeholder="https://yourdomain.com" value={form.wp_url} onChange={e => update("wp_url", e.target.value)} />
+                      <input className="input" placeholder="WordPress username" value={form.wp_user} onChange={e => update("wp_user", e.target.value)} />
+                      <input className="input" type="password" placeholder="Application password" value={form.wp_pass} onChange={e => update("wp_pass", e.target.value)} />
+                      <p style={{ fontSize: 12, color: "var(--text-muted)", margin: 0 }}>
+                        Generate an app password in WordPress → Users → Profile → Application Passwords
+                      </p>
+                      <button className="btn btn-secondary" type="submit" disabled={loading}>
+                        {loading ? "Verifying..." : "Connect WordPress"}
+                      </button>
+                    </form>
+                  ) : (
+                    <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{form.wp_url}</div>
+                  )}
+                </div>
+
+                {/* YouTube */}
+                <div style={{ marginBottom: 24 }}>
+                  <div className="label" style={{ marginBottom: 12 }}>YouTube Channel</div>
+                  <button className="btn btn-secondary" style={{ width: "100%" }} onClick={connectYouTube} disabled={ytLoading}>
+                    {ytLoading ? "Redirecting to Google..." : "Connect YouTube"}
+                  </button>
+                  <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>
+                    You'll be redirected to Google to authorise access.
+                  </p>
+                </div>
+
+                {error && <div className="alert alert-error">{error}</div>}
+
+                <button className="btn btn-primary btn-lg" style={{ width: "100%" }} onClick={finish}>
+                  Finish Setup
+                </button>
+                <button type="button" className="btn btn-ghost" style={{ width: "100%", marginTop: 12 }} onClick={finish}>
+                  Skip for now
+                </button>
+              </div>
             ) : (
+              /* ── Sign-up steps 1 & 2 ── */
               <form onSubmit={handleSignup}>
                 {step === 1 ? (
                   <>
-                    <div className="onboarding-step">Step 1 of 2</div>
+                    <div className="onboarding-step">Step 1 of 3</div>
                     <h3 style={{ marginBottom: 24, fontSize: 22 }}>Create your account</h3>
                     <div className="field">
                       <label className="label">Full Name</label>
@@ -134,7 +211,7 @@ export function Onboarding({ onComplete }) {
                   </>
                 ) : (
                   <>
-                    <div className="onboarding-step">Step 2 of 2</div>
+                    <div className="onboarding-step">Step 2 of 3</div>
                     <h3 style={{ marginBottom: 24, fontSize: 22 }}>Your business details</h3>
                     <div className="field">
                       <label className="label">Business Name</label>
@@ -145,7 +222,7 @@ export function Onboarding({ onComplete }) {
                 )}
                 {error && <div className="alert alert-error">{error}</div>}
                 <button className="btn btn-primary btn-lg" style={{ width: "100%" }} disabled={loading}>
-                  {loading ? <span className="spinner"></span> : step === 1 ? "Continue" : "Create Account"}
+                  {loading ? <span className="spinner"></span> : step === 1 ? "Continue" : "Continue"}
                 </button>
                 {step === 2 && (
                   <button type="button" className="btn btn-ghost" style={{ width: "100%", marginTop: 12 }} onClick={() => setStep(1)}>
@@ -155,17 +232,15 @@ export function Onboarding({ onComplete }) {
               </form>
             )}
 
-            <div className="divider-text">
-              <span>or</span>
-            </div>
-
-            <button 
-              className="btn btn-secondary" 
-              style={{ width: "100%" }} 
-              onClick={() => { setIsLogin(!isLogin); setStep(1); setError(""); }}
-            >
-              {isLogin ? "Create an Account" : "Sign In Instead"}
-            </button>
+            {step !== 3 && (
+              <>
+                <div className="divider-text"><span>or</span></div>
+                <button className="btn btn-secondary" style={{ width: "100%" }}
+                  onClick={() => { setIsLogin(!isLogin); setStep(1); setError(""); }}>
+                  {isLogin ? "Create an Account" : "Sign In Instead"}
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
