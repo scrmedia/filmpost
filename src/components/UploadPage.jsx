@@ -42,7 +42,10 @@ export function UploadPage({ user, onSuccess }) {
   const generateContent = async () => {
     setLoading(true); setLoadingMsg("Crafting your content with AI..."); setError("");
     try {
-      const systemPrompt = `You are an expert copywriter for luxury UK wedding videographers. Write in elegant British English, using evocative but authentic language. Avoid clichés and overly salesy phrasing. Focus on emotion, atmosphere, and the couple's story.`;
+      const toneInstruction = user?.tone_of_voice
+        ? `\n\nWrite in a style that reflects this brand voice: ${user.tone_of_voice}`
+        : "";
+      const systemPrompt = `You are an expert copywriter for luxury UK wedding videographers. Write in elegant British English, using evocative but authentic language. Avoid clichés and overly salesy phrasing. Focus on emotion, atmosphere, and the couple's story.${toneInstruction}`;
       const answersText = VENUE_QUESTIONS.map(q => venueAnswers[q.id] ? `${q.label}: ${venueAnswers[q.id]}` : "").filter(Boolean).join("\n");
 
       const title = await callClaude(systemPrompt, `Create a YouTube title for a wedding film at "${venueName}". Elegant, include venue name, under 70 characters. Return ONLY the title, no quotes.`);
