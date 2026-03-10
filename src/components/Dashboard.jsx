@@ -46,7 +46,7 @@ export function Dashboard({ user, posts, setPage }) {
           <h1 className="page-title">Dashboard</h1>
           <p className="page-description">Welcome back, {user?.name?.split(" ")[0] || "there"}. Here's your publishing overview.</p>
         </div>
-        <div className="header-actions">
+        <div className="header-actions hide-on-mobile">
           <button className="btn btn-primary" onClick={() => setPage("upload")}>
             <Icon.Plus /> New Upload
           </button>

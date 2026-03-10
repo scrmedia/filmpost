@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { styles } from "./styles";
 import { supabase } from "./utils";
+import { Icon } from "./icons";
 import { Sidebar } from "./components/Sidebar";
 import { Dashboard } from "./components/Dashboard";
 import { Onboarding } from "./components/Onboarding";
@@ -12,6 +13,14 @@ import { YouTubeCallback } from "./components/YouTubeCallback";
 
 const isYTCallback = window.location.pathname === "/youtube/callback";
 
+const isMobile = () => window.innerWidth <= 768;
+
+const MOBILE_NAV_ITEMS = [
+  { id: "history", label: "History", icon: Icon.History },
+  { id: "profile", label: "Profile", icon: Icon.User },
+  { id: "settings", label: "Settings", icon: Icon.Settings },
+];
+
 export default function App() {
   // Read user synchronously so it's available on the very first render.
   // This is critical for the YouTube OAuth callback path — YouTubeCallback
@@ -20,9 +29,16 @@ export default function App() {
     const stored = localStorage.getItem("filmpost_user");
     return stored ? JSON.parse(stored) : null;
   });
-  const [page, setPage] = useState("dashboard");
+  const [page, setPage] = useState(() => isMobile() ? "history" : "dashboard");
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // On mobile, redirect away from upload (and dashboard) to history
+  useEffect(() => {
+    if (isMobile() && page === "upload") {
+      setPage("history");
+    }
+  }, [page]);
 
   useEffect(() => {
     if (user) loadPosts(user.id);
@@ -103,6 +119,11 @@ export default function App() {
           onLogout={handleLogout}
         />
         <main className="main-content">
+          {/* Mobile-only informational banner */}
+          <div className="mobile-banner">
+            To upload a wedding film and generate content, visit FilmPost on your desktop or laptop.
+          </div>
+
           {page === "dashboard" && <Dashboard user={user} posts={posts} setPage={setPage} />}
           {page === "upload" && <UploadPage user={user} onSuccess={() => loadPosts(user.id)} />}
           {page === "history" && <HistoryPage posts={posts} user={user} />}
@@ -110,6 +131,20 @@ export default function App() {
           {page === "profile" && <ProfilePage user={user} onUpdate={saveUser} />}
         </main>
       </div>
+
+      {/* Mobile-only bottom navigation (History, Profile, Settings) */}
+      <nav className="mobile-bottom-nav">
+        {MOBILE_NAV_ITEMS.map(item => (
+          <div
+            key={item.id}
+            className={`mobile-nav-item ${page === item.id ? "active" : ""}`}
+            onClick={() => setPage(item.id)}
+          >
+            <span className="mobile-nav-icon"><item.icon /></span>
+            <span className="mobile-nav-label">{item.label}</span>
+          </div>
+        ))}
+      </nav>
     </>
   );
 }
