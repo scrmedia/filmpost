@@ -28,13 +28,3 @@ CREATE TABLE IF NOT EXISTS venues (
 
 -- Index for fast per-user lookups
 CREATE INDEX IF NOT EXISTS venues_user_id_idx ON venues (user_id);
-
--- Row-level security (mirrors the posts table pattern)
-ALTER TABLE venues ENABLE ROW LEVEL SECURITY;
-
--- Users can only see and modify their own venues
-CREATE POLICY IF NOT EXISTS "venues: owner access"
-  ON venues
-  FOR ALL
-  USING      (user_id = auth.uid()::uuid)
-  WITH CHECK (user_id = auth.uid()::uuid);
