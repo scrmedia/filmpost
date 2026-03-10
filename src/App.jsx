@@ -13,20 +13,21 @@ import { YouTubeCallback } from "./components/YouTubeCallback";
 const isYTCallback = window.location.pathname === "/youtube/callback";
 
 export default function App() {
-  const [user, setUser] = useState(null);
+  // Read user synchronously so it's available on the very first render.
+  // This is critical for the YouTube OAuth callback path — YouTubeCallback
+  // mounts immediately (before any useEffect fires) and needs a populated user.
+  const [user, setUser] = useState(() => {
+    const stored = localStorage.getItem("filmpost_user");
+    return stored ? JSON.parse(stored) : null;
+  });
   const [page, setPage] = useState("dashboard");
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const stored = localStorage.getItem("filmpost_user");
-    if (stored) {
-      const u = JSON.parse(stored);
-      setUser(u);
-      loadPosts(u.id);
-    }
+    if (user) loadPosts(user.id);
     setLoading(false);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadPosts = async (userId) => {
     const { data, error } = await supabase
