@@ -1981,7 +1981,7 @@ Make it feel personal and authentic, not generic. Return ONLY the HTML content.`
         await new Promise(r => setTimeout(r, 200));
       }
 
-      const { data, error: err } = await supabase
+      const { error: err } = await supabase
         .from("posts")
         .insert([{
           user_id: user.id,
@@ -2332,7 +2332,7 @@ function SettingsPage({ user }) {
                   {ytConnected ? (
                     <span className="connected-badge"><span className="status-dot" style={{ background: "var(--success)" }}></span> Connected</span>
                   ) : (
-                    <button className="btn btn-secondary btn-sm">Connect</button>
+                    <button className="btn btn-secondary btn-sm" onClick={() => setYtConnected(true)}>Connect</button>
                   )}
                 </div>
               </div>
@@ -2347,7 +2347,7 @@ function SettingsPage({ user }) {
                   {wpConnected ? (
                     <span className="connected-badge"><span className="status-dot" style={{ background: "var(--success)" }}></span> Connected</span>
                   ) : (
-                    <button className="btn btn-secondary btn-sm">Connect</button>
+                    <button className="btn btn-secondary btn-sm" onClick={() => setWpConnected(true)}>Connect</button>
                   )}
                 </div>
               </div>
