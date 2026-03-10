@@ -23,8 +23,8 @@ export default async function handler(req, res) {
     if (action === 'exchangeCode') {
       const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
           code,
           client_id: process.env.YOUTUBE_CLIENT_ID,
           client_secret: process.env.YOUTUBE_CLIENT_SECRET,
@@ -33,6 +33,9 @@ export default async function handler(req, res) {
         }),
       });
       const tokenData = await tokenResponse.json();
+      if (!tokenResponse.ok || tokenData.error) {
+        throw new Error(tokenData.error_description || tokenData.error || 'Token exchange failed');
+      }
       const { access_token, refresh_token } = tokenData;
 
       const channelResponse = await fetch(
@@ -51,8 +54,8 @@ export default async function handler(req, res) {
     if (action === 'refreshToken') {
       const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
           refresh_token: refreshToken,
           client_id: process.env.YOUTUBE_CLIENT_ID,
           client_secret: process.env.YOUTUBE_CLIENT_SECRET,
@@ -60,6 +63,9 @@ export default async function handler(req, res) {
         }),
       });
       const tokenData = await tokenResponse.json();
+      if (!tokenResponse.ok || tokenData.error) {
+        throw new Error(tokenData.error_description || tokenData.error || 'Token refresh failed');
+      }
       const { access_token } = tokenData;
 
       return res.status(200).json({ access_token });
