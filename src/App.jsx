@@ -134,13 +134,13 @@ function getSession() { return STORE.session; }
 function saveSession(u) { STORE.session = u; }
 function clearSession() { STORE.session = null; }
 
-async function callClaude(systemPrompt, userPrompt) {
+async function callClaude(systemPrompt, userPrompt, maxTokens = 2000) {
   const response = await fetch('/api/claude', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 1000,
+      max_tokens: maxTokens,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
     }),
@@ -428,7 +428,7 @@ function UploadWizard({ user, onSaveUser }) {
       const blogRaw = await callClaude(
         "You are an expert wedding blog writer for a UK wedding videography company. Write in a warm, first-person voice. Return ONLY valid JSON with keys: title (string), metaDescription (max 155 chars), content (full HTML, 900-1100 words using h2, h3, p, ul tags). No markdown wrapper.",
         `Write a venue guide blog post for ${user.businessName}.\n${baseContext}\nTarget keyword: "wedding videographer ${venue}". Include: scene-setting intro, filming highlights, lighting tips, personal anecdote if provided, insider tips, CTA to enquire.`,
-        
+        6000,
       );
       const blog = JSON.parse(blogRaw.replace(/```json|```/g, "").trim());
 
