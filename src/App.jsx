@@ -8,6 +8,9 @@ import { UploadPage } from "./components/UploadPage";
 import { HistoryPage } from "./components/HistoryPage";
 import { SettingsPage } from "./components/SettingsPage";
 import { ProfilePage } from "./components/ProfilePage";
+import { YouTubeCallback } from "./components/YouTubeCallback";
+
+const isYTCallback = window.location.pathname === "/youtube/callback";
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -46,6 +49,27 @@ export default function App() {
     setPage("dashboard");
   };
 
+  const saveUser = (u) => {
+    setUser(u);
+    localStorage.setItem("filmpost_user", JSON.stringify(u));
+  };
+
+  if (isYTCallback) {
+    return (
+      <>
+        <style>{styles}</style>
+        <YouTubeCallback
+          user={user}
+          onComplete={(u) => {
+            saveUser(u);
+            window.history.replaceState({}, "", "/");
+            window.location.reload();
+          }}
+        />
+      </>
+    );
+  }
+
   if (loading) {
     return (
       <>
@@ -71,18 +95,18 @@ export default function App() {
     <>
       <style>{styles}</style>
       <div className="app-layout">
-        <Sidebar 
-          currentPage={page} 
-          setPage={setPage} 
-          user={user} 
-          onLogout={handleLogout} 
+        <Sidebar
+          currentPage={page}
+          setPage={setPage}
+          user={user}
+          onLogout={handleLogout}
         />
         <main className="main-content">
           {page === "dashboard" && <Dashboard user={user} posts={posts} setPage={setPage} />}
           {page === "upload" && <UploadPage user={user} onSuccess={() => loadPosts(user.id)} />}
           {page === "history" && <HistoryPage posts={posts} />}
-          {page === "settings" && <SettingsPage user={user} />}
-          {page === "profile" && <ProfilePage user={user} onUpdate={(u) => { setUser(u); localStorage.setItem("filmpost_user", JSON.stringify(u)); }} />}
+          {page === "settings" && <SettingsPage user={user} onSaveUser={saveUser} />}
+          {page === "profile" && <ProfilePage user={user} onUpdate={saveUser} />}
         </main>
       </div>
     </>
