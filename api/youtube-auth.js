@@ -8,6 +8,8 @@ export default async function handler(req, res) {
     const { action, code, refreshToken } = req.body;
 
     if (action === 'getAuthUrl') {
+      if (!process.env.YOUTUBE_CLIENT_ID) return res.status(500).json({ error: 'YOUTUBE_CLIENT_ID env var is not set' });
+      if (!process.env.YOUTUBE_REDIRECT_URI) return res.status(500).json({ error: 'YOUTUBE_REDIRECT_URI env var is not set' });
       const params = new URLSearchParams({
         client_id: process.env.YOUTUBE_CLIENT_ID,
         redirect_uri: process.env.YOUTUBE_REDIRECT_URI,
