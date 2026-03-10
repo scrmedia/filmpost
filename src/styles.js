@@ -1310,6 +1310,122 @@ export const styles = `
     background: var(--text-muted);
   }
   
+  /* Featured film background (Onboarding page) */
+  .video-bg-layer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    transition: opacity 0.6s ease;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  .video-bg-iframe {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    /* Scale to cover viewport while preserving 16:9 */
+    width: 177.78vh;
+    height: 100vh;
+    min-width: 100%;
+    min-height: 56.25vw;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    border: none;
+  }
+
+  .video-bg-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.52);
+  }
+
+  /* Part 5: Credit pill — bottom-left corner */
+  .video-credit {
+    position: fixed;
+    bottom: 24px;
+    left: 24px;
+    z-index: 10;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px;
+    padding: 8px 16px;
+    transition: opacity 0.6s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-width: 300px;
+  }
+
+  .video-credit-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+    text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.4;
+  }
+
+  .video-credit-name:hover {
+    text-decoration: underline;
+  }
+
+  .video-credit-title {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.6);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.4;
+  }
+
+  /* Community & Visibility opt-in toggle (ProfilePage) */
+  .featured-opt-in-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    cursor: pointer;
+    padding: 4px 0;
+  }
+
+  .featured-opt-in-checkbox {
+    width: 16px;
+    height: 16px;
+    margin-top: 2px;
+    flex-shrink: 0;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+
+  .featured-opt-in-text {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .featured-opt-in-heading {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    line-height: 1.4;
+  }
+
+  .featured-opt-in-desc {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
   /* Mobile Responsive */
   @media (max-width: 1024px) {
     .stats-grid {
