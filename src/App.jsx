@@ -452,28 +452,45 @@ function UploadWizard({ user, onSaveUser }) {
 
   const setAnswer = (id, val) => setAnswers(p => ({ ...p, [id]: val }));
 
-  // Auto-upload to YouTube when step 5 is reached
+  // Auto-upload to YouTube when step 5 is reached (chunked proxy to avoid CORS)
   useEffect(() => {
     if (wizardStep !== 5 || !publishResults.youtube?.pending || !file || ytUploadStarted.current) return;
     ytUploadStarted.current = true;
-    const xhr = new XMLHttpRequest();
-    xhr.open("PUT", publishResults.youtube.uploadUri);
-    xhr.setRequestHeader("Content-Type", file.type || "video/mp4");
-    setYtUpload({ state: "uploading", progress: 0 });
-    xhr.upload.onprogress = e => {
-      if (e.lengthComputable) setYtUpload({ state: "uploading", progress: Math.round(e.loaded / e.total * 100) });
-    };
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        const data = JSON.parse(xhr.responseText);
-        setYtUpload({ state: "done", videoId: data.id, url: `https://www.youtube.com/watch?v=${data.id}` });
-      } else {
-        setYtUpload({ state: "error", error: `Upload failed (${xhr.status})` });
+    let aborted = false;
+    const CHUNK_SIZE = 4 * 1024 * 1024; // 4 MB — within Vercel's body limit
+    const upload = async () => {
+      try {
+        const { uploadUri } = publishResults.youtube;
+        const totalSize = file.size;
+        const contentType = file.type || "video/mp4";
+        let offset = 0;
+        setYtUpload({ state: "uploading", progress: 0 });
+        while (offset < totalSize && !aborted) {
+          const end = Math.min(offset + CHUNK_SIZE - 1, totalSize - 1);
+          const chunk = file.slice(offset, end + 1);
+          const contentRange = `bytes ${offset}-${end}/${totalSize}`;
+          const res = await fetch(
+            `/api/youtube-upload-chunk?uploadUri=${encodeURIComponent(uploadUri)}&contentRange=${encodeURIComponent(contentRange)}&contentType=${encodeURIComponent(contentType)}`,
+            { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: chunk }
+          );
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `Upload failed (${res.status})`);
+          }
+          const data = await res.json();
+          if (data.complete && data.videoId) {
+            if (!aborted) setYtUpload({ state: "done", videoId: data.videoId, url: `https://www.youtube.com/watch?v=${data.videoId}` });
+            return;
+          }
+          offset = end + 1;
+          if (!aborted) setYtUpload({ state: "uploading", progress: Math.round((offset / totalSize) * 100) });
+        }
+      } catch (e) {
+        if (!aborted) setYtUpload({ state: "error", error: e.message });
       }
     };
-    xhr.onerror = () => setYtUpload({ state: "error", error: "Network error during upload" });
-    xhr.send(file);
-    return () => xhr.abort();
+    upload();
+    return () => { aborted = true; };
   }, [wizardStep]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onDrop = useCallback(e => {
