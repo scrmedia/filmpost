@@ -55,7 +55,40 @@ export function UploadPage({ user, onSuccess }) {
       const desc = await callClaude(systemPrompt, `Write a YouTube description for this wedding film:\nVenue: ${venueName}\n${answersText}\n\nInclude an evocative opening, filming highlights, then end with this exact footer:\n\n${footer}\n\nUnder 4000 characters. Return ONLY the description text.`);
       setYoutubeDesc(desc.trim());
 
-      const blog = await callClaude(systemPrompt, `Write an 800-1200 word blog post about filming a wedding at "${venueName}" for a wedding videographer's website.\n\n${answersText}\n\nStructure: compelling headline, immersive opening, sections on venue/atmosphere/filming highlights, subtle CTA. Use HTML: <h2>, <p>, <strong>. Return ONLY the HTML.`);
+      const seoPlugin = user?.seo_plugin || "";
+      const seoSection = seoPlugin === "yoast" ? `
+
+After the main blog post HTML, append this section EXACTLY as shown (labels and all), with values generated from the content above:
+
+<!-- YOAST SEO -->
+SEO Title: [max 60 characters, include venue name and keyword]
+Meta Description: [max 155 characters, compelling summary]
+Focus Keyphrase: [single keyword or short phrase]
+Slug: [url-friendly, lowercase, hyphens, no domain]
+<!-- END YOAST SEO -->`
+        : seoPlugin === "rankmath" ? `
+
+After the main blog post HTML, append this section EXACTLY as shown (labels and all), with values generated from the content above:
+
+<!-- RANK MATH SEO -->
+SEO Title: [max 60 characters, include venue name and keyword]
+Meta Description: [max 155 characters, compelling summary]
+Focus Keyword: [single keyword or short phrase]
+Canonical Slug: [url-friendly, lowercase, hyphens, no domain]
+<!-- END RANK MATH SEO -->`
+        : seoPlugin === "aioseo" ? `
+
+After the main blog post HTML, append this section EXACTLY as shown (labels and all), with values generated from the content above:
+
+<!-- ALL IN ONE SEO -->
+Post Title: [max 60 characters, include venue name and keyword]
+Meta Description: [max 160 characters, compelling summary]
+Focus Keyphrase: [single keyword or short phrase]
+Slug: [url-friendly, lowercase, hyphens, no domain]
+<!-- END ALL IN ONE SEO -->`
+        : "";
+
+      const blog = await callClaude(systemPrompt, `Write an 800-1200 word blog post about filming a wedding at "${venueName}" for a wedding videographer's website.\n\n${answersText}\n\nStructure: compelling headline, immersive opening, sections on venue/atmosphere/filming highlights, subtle CTA. Use HTML: <h2>, <p>, <strong>.${seoSection}\n\nReturn ONLY the HTML (and the SEO block if requested, as plain text after the HTML).`);
       setBlogContent(blog.trim());
 
       setStep(3);
