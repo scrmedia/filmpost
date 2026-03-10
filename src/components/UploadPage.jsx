@@ -16,6 +16,10 @@ export function UploadPage({ user, onSuccess }) {
   const [loadingMsg, setLoadingMsg] = useState("");
   const [error, setError] = useState("");
 
+  // Hero image
+  const [heroImage, setHeroImage] = useState(null);
+  const [heroImagePreview, setHeroImagePreview] = useState(null);
+
   // Publish results
   const [wpResult, setWpResult] = useState(null);   // { success, editUrl?, error? }
   const [ytUploadUri, setYtUploadUri] = useState(null);
@@ -25,11 +29,13 @@ export function UploadPage({ user, onSuccess }) {
   const ytUploadStarted = useRef(false);
   const wpPostIdRef = useRef(null);       // WP post ID — needed by the upload useEffect
   const blogContentRef = useRef("");      // current blogContent — needed by the upload useEffect
+  const heroImageRef = useRef(null);      // current heroImage — needed by the upload useEffect
   const dropRef = useRef(null);
   const [dragOver, setDragOver] = useState(false);
 
-  // Keep ref in sync so the upload useEffect always reads the latest blog content
+  // Keep refs in sync so the upload useEffect always reads the latest values
   useEffect(() => { blogContentRef.current = blogContent; }, [blogContent]);
+  useEffect(() => { heroImageRef.current = heroImage; }, [heroImage]);
 
   // ── File handling ──────────────────────────────────────────────────────────
   const handleDrop = useCallback((e) => {
@@ -41,6 +47,14 @@ export function UploadPage({ user, onSuccess }) {
   const handleFileSelect = (e) => {
     const f = e.target.files?.[0];
     if (f && f.type.startsWith("video/")) setFile(f);
+  };
+
+  const handleHeroImageSelect = (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (heroImagePreview) URL.revokeObjectURL(heroImagePreview);
+    setHeroImage(f);
+    setHeroImagePreview(URL.createObjectURL(f));
   };
 
   // ── Generate content ───────────────────────────────────────────────────────
@@ -194,6 +208,32 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
           const post = await res.json();
           wp = { success: true, editUrl: `${user.wp_url}/wp-admin/post.php?post=${post.id}&action=edit` };
           wpPostIdRef.current = post.id;
+
+          // Upload hero image as WordPress featured media
+          if (heroImage) {
+            try {
+              setLoadingMsg("Setting featured image...");
+              const mediaRes = await fetch(`${user.wp_url}/wp-json/wp/v2/media`, {
+                method: "POST",
+                headers: {
+                  Authorization: `Basic ${creds}`,
+                  "Content-Type": heroImage.type,
+                  "Content-Disposition": `attachment; filename="${heroImage.name}"`,
+                },
+                body: heroImage,
+              });
+              if (mediaRes.ok) {
+                const media = await mediaRes.json();
+                await fetch(`${user.wp_url}/wp-json/wp/v2/posts/${post.id}`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", Authorization: `Basic ${creds}` },
+                  body: JSON.stringify({ featured_media: media.id }),
+                });
+              }
+            } catch (e) {
+              console.error("Failed to set WordPress featured image:", e.message);
+            }
+          }
         }
       } catch (e) {
         wp = { success: false, error: e.message };
@@ -274,6 +314,29 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
                   youtube_url: youtubeUrl,
                   status: "published",
                 }).eq("id", savedPostId);
+              }
+
+              // Set YouTube thumbnail
+              if (heroImageRef.current) {
+                try {
+                  const arrayBuffer = await heroImageRef.current.arrayBuffer();
+                  const bytes = new Uint8Array(arrayBuffer);
+                  let binary = "";
+                  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+                  const imageBase64 = btoa(binary);
+                  await fetch("/api/youtube-thumbnail", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      videoId: data.videoId,
+                      refreshToken: user.youtube_refresh_token,
+                      imageBase64,
+                      mimeType: heroImageRef.current.type,
+                    }),
+                  });
+                } catch (e) {
+                  console.error("YouTube thumbnail failed:", e.message);
+                }
               }
 
               // Inject YouTube embed into the WordPress draft
@@ -395,6 +458,42 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
                   )}
                 </div>
               ))}
+              <div className="field" style={{ marginTop: 24 }}>
+                <label className="label">
+                  Hero Image <span className="label-hint">(used as YouTube thumbnail and blog featured image)</span>
+                </label>
+                <div
+                  className={`hero-image-picker ${heroImage ? "has-image" : ""}`}
+                  onClick={() => document.getElementById("heroImageInput").click()}
+                >
+                  <input
+                    id="heroImageInput"
+                    type="file"
+                    accept=".jpg,.jpeg,.png"
+                    hidden
+                    onChange={handleHeroImageSelect}
+                  />
+                  {heroImagePreview ? (
+                    <img src={heroImagePreview} alt="Hero preview" className="hero-image-preview" />
+                  ) : (
+                    <div className="hero-image-placeholder">
+                      <Icon.Upload />
+                      <span>Click to upload JPG or PNG</span>
+                    </div>
+                  )}
+                </div>
+                {heroImage && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    style={{ marginTop: 8, fontSize: 12, padding: "4px 10px" }}
+                    onClick={(e) => { e.stopPropagation(); if (heroImagePreview) URL.revokeObjectURL(heroImagePreview); setHeroImage(null); setHeroImagePreview(null); }}
+                  >
+                    Remove image
+                  </button>
+                )}
+              </div>
+
               <div style={{ display: "flex", gap: 12, marginTop: 32 }}>
                 <button className="btn btn-secondary" onClick={() => setStep(1)}>Back</button>
                 <button className="btn btn-primary btn-lg" disabled={!venueName} onClick={generateContent}>
@@ -511,7 +610,7 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
                   ) : null}
                 </div>
 
-                <button className="btn btn-primary" style={{ marginTop: 32 }} onClick={() => { setStep(1); setFile(null); setVenueName(""); setVenueAnswers({}); setYoutubeTitle(""); setYoutubeDesc(""); setBlogContent(""); setWpResult(null); setYtUploadUri(null); setYtUpload({ state: "idle", progress: 0, videoId: null, error: null }); ytUploadStarted.current = false; wpPostIdRef.current = null; blogContentRef.current = ""; }}>
+                <button className="btn btn-primary" style={{ marginTop: 32 }} onClick={() => { setStep(1); setFile(null); setVenueName(""); setVenueAnswers({}); setYoutubeTitle(""); setYoutubeDesc(""); setBlogContent(""); setWpResult(null); setYtUploadUri(null); setYtUpload({ state: "idle", progress: 0, videoId: null, error: null }); ytUploadStarted.current = false; wpPostIdRef.current = null; blogContentRef.current = ""; if (heroImagePreview) URL.revokeObjectURL(heroImagePreview); setHeroImage(null); setHeroImagePreview(null); heroImageRef.current = null; setSavedPostId(null); }}>
                   + New Film
                 </button>
               </div>

@@ -1310,6 +1310,48 @@ export const styles = `
     background: var(--text-muted);
   }
   
+  /* Hero image picker (Upload step 2) */
+  .hero-image-picker {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    cursor: pointer;
+    transition: var(--transition);
+    min-height: 160px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface-elevated);
+  }
+
+  .hero-image-picker:hover {
+    border-color: var(--accent);
+    background: var(--surface);
+  }
+
+  .hero-image-picker.has-image {
+    border-style: solid;
+    border-color: var(--accent);
+    min-height: unset;
+  }
+
+  .hero-image-preview {
+    width: 100%;
+    max-height: 280px;
+    object-fit: cover;
+    display: block;
+  }
+
+  .hero-image-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-muted);
+    font-size: 13px;
+    padding: 32px;
+  }
+
   /* Featured film background (Onboarding page) */
   .video-bg-layer {
     position: fixed;
