@@ -25,6 +25,7 @@ export function Onboarding({ onComplete }) {
         .eq("email", form.email)
         .single();
       if (err || !data) throw new Error("Invalid credentials");
+      if (!data.password_hash) throw new Error("Account has no password set — please create a new account");
       const valid = await bcrypt.compare(form.password, data.password_hash);
       if (!valid) throw new Error("Invalid credentials");
       onComplete(data);
