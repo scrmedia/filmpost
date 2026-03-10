@@ -15,7 +15,7 @@ const styles = `
   :root {
     --black: #0a0a0a; --deep: #111111; --surface: #191919; --border: #2a2a2a;
     --muted: #3a3a3a; --text-dim: #888; --text: #d4cfc9; --text-bright: #f5f0eb;
-    --gold: #c9a96e; --gold-dim: #8a6f42; --red: #c0392b; --green: #27ae60; --radius: 4px;
+    --gold: #c9a96e; --gold-dim: #8a6f42; --red: #c0392b; --green: #27ae60; --amber: #e67e22; --radius: 4px;
   }
   body { font-family: 'DM Sans', sans-serif; background: var(--black); color: var(--text); min-height: 100vh; font-size: 14px; line-height: 1.6; }
   h1, h2, h3 { font-family: 'Cormorant Garamond', serif; font-weight: 300; letter-spacing: 0.02em; }
@@ -77,6 +77,9 @@ const styles = `
   .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
   .status-dot.green { background: var(--green); }
   .status-dot.red { background: var(--red); }
+  .status-dot.amber { background: var(--amber); }
+  .yt-progress { height: 4px; background: var(--border); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+  .yt-progress-bar { height: 100%; background: var(--gold); transition: width 0.3s; }
   .alert { padding: 14px 18px; border-left: 3px solid; margin-bottom: 20px; font-size: 13px; }
   .alert-info { border-color: var(--gold); background: rgba(201,169,110,0.06); color: var(--text); }
   .alert-error { border-color: var(--red); background: rgba(192,57,43,0.06); color: var(--text); }
@@ -178,6 +181,7 @@ const Icon = {
   Logout: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
   External: () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>,
   Copy: () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>,
+  YouTube: () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46a2.78 2.78 0 0 0-1.95 1.96A29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58A2.78 2.78 0 0 0 3.41 19.54C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 0 0 1.95-1.96A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z"/><polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" fill="currentColor" stroke="none"/></svg>,
 };
 
 // ── Business Profile Fields ───────────────────────────────────────────────────
@@ -372,6 +376,61 @@ function Login({ onLogin, onRegister }) {
   );
 }
 
+// ── YouTube Callback ──────────────────────────────────────────────────────────
+function YouTubeCallback({ user, onComplete }) {
+  const [status, setStatus] = useState("Connecting your YouTube channel...");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const exchange = async () => {
+      try {
+        const code = new URLSearchParams(window.location.search).get("code");
+        if (!code) throw new Error("No authorisation code found in URL");
+        const res = await fetch("/api/youtube-auth", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "exchangeCode", code }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to connect YouTube");
+        await supabase.from("users").update({
+          youtube_access_token: data.access_token,
+          youtube_refresh_token: data.refresh_token,
+          youtube_channel_name: data.channel_name,
+        }).eq("id", user.id);
+        setStatus(`Connected: ${data.channel_name}`);
+        setTimeout(() => onComplete({
+          ...user,
+          youtube_access_token: data.access_token,
+          youtube_refresh_token: data.refresh_token,
+          youtube_channel_name: data.channel_name,
+        }), 800);
+      } catch (e) { setError(e.message); }
+    };
+    exchange();
+  }, []);
+
+  return (
+    <div style={{ minHeight: "100vh", background: "var(--black)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <style>{styles}</style>
+      <div style={{ textAlign: "center" }}>
+        {error ? (
+          <>
+            <div style={{ fontSize: 40, marginBottom: 16 }}>✕</div>
+            <div style={{ color: "var(--red)", marginBottom: 16 }}>{error}</div>
+            <button className="btn btn-ghost" onClick={() => { window.history.replaceState({}, "", "/"); window.location.reload(); }}>Return to app</button>
+          </>
+        ) : (
+          <>
+            <div className="spinner" style={{ width: 40, height: 40, borderWidth: 3, margin: "0 auto 20px" }} />
+            <div style={{ color: "var(--text)", fontSize: 15 }}>{status}</div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Upload Wizard ─────────────────────────────────────────────────────────────
 function UploadWizard({ user, onSaveUser }) {
   const [wizardStep, setWizardStep] = useState(1);
@@ -387,9 +446,35 @@ function UploadWizard({ user, onSaveUser }) {
   const [loadingMsg, setLoadingMsg] = useState("");
   const [error, setError] = useState("");
   const [publishResults, setPublishResults] = useState({});
+  const [ytUpload, setYtUpload] = useState(null);
+  const ytUploadStarted = useRef(false);
   const fileRef = useRef();
 
   const setAnswer = (id, val) => setAnswers(p => ({ ...p, [id]: val }));
+
+  // Auto-upload to YouTube when step 5 is reached
+  useEffect(() => {
+    if (wizardStep !== 5 || !publishResults.youtube?.pending || !file || ytUploadStarted.current) return;
+    ytUploadStarted.current = true;
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", publishResults.youtube.uploadUri);
+    xhr.setRequestHeader("Content-Type", file.type || "video/mp4");
+    setYtUpload({ state: "uploading", progress: 0 });
+    xhr.upload.onprogress = e => {
+      if (e.lengthComputable) setYtUpload({ state: "uploading", progress: Math.round(e.loaded / e.total * 100) });
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        const data = JSON.parse(xhr.responseText);
+        setYtUpload({ state: "done", videoId: data.id, url: `https://www.youtube.com/watch?v=${data.id}` });
+      } else {
+        setYtUpload({ state: "error", error: `Upload failed (${xhr.status})` });
+      }
+    };
+    xhr.onerror = () => setYtUpload({ state: "error", error: "Network error during upload" });
+    xhr.send(file);
+    return () => xhr.abort();
+  }, [wizardStep]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onDrop = useCallback(e => {
     e.preventDefault(); setDragOver(false);
@@ -458,6 +543,28 @@ function UploadWizard({ user, onSaveUser }) {
         wp_edit_url: results.wordpress?.editUrl || null,
       }]);
     } catch (e) { console.error("Failed to save post history:", e); }
+
+    // Initiate YouTube resumable upload session if connected
+    if (user.youtube_access_token) {
+      try {
+        setLoadingMsg("Preparing YouTube upload...");
+        const initRes = await fetch("/api/youtube-upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: generated.yt.title,
+            description: generated.yt.description,
+            tags: generated.yt.tags,
+            refreshToken: user.youtube_refresh_token,
+          }),
+        });
+        const initData = await initRes.json();
+        if (!initRes.ok) throw new Error(initData.error || "Failed to initiate YouTube upload");
+        results.youtube = { pending: true, uploadUri: initData.uploadUri };
+      } catch (e) {
+        results.youtube = { success: false, error: e.message };
+      }
+    }
 
     setPublishResults(results);
     setLoading(false); setLoadingMsg("");
@@ -579,7 +686,9 @@ function UploadWizard({ user, onSaveUser }) {
           <h2 className="card-title">Ready to publish</h2>
           <div className="settings-row">
             <div><div className="settings-key">🎬 YouTube</div><div className="settings-val" style={{ marginTop: 4 }}>{generated.yt.title}</div></div>
-            <span style={{ fontSize: 12, color: "var(--text-dim)" }}>Copy & paste upload</span>
+            {user.youtube_access_token
+              ? <span className="connected"><span className="status-dot green" />Will upload automatically</span>
+              : <span style={{ fontSize: 12, color: "var(--amber)", display: "flex", alignItems: "center", gap: 6 }}><span className="status-dot amber" />Connect YouTube in Settings</span>}
           </div>
           <div className="settings-row">
             <div><div className="settings-key">✍️ WordPress Draft</div><div className="settings-val" style={{ marginTop: 4 }}>{generated.blog.title}</div></div>
@@ -605,6 +714,21 @@ function UploadWizard({ user, onSaveUser }) {
               </a>
             )}
             {publishResults.wordpress?.success === false && <div className="alert alert-error">WordPress failed: {publishResults.wordpress.error}</div>}
+            {ytUpload?.state === "uploading" && (
+              <div className="card" style={{ margin: 0, background: "var(--deep)", textAlign: "left" }}>
+                <div className="preview-label">Uploading to YouTube</div>
+                <div className="yt-progress"><div className="yt-progress-bar" style={{ width: `${ytUpload.progress}%` }} /></div>
+                <div style={{ fontSize: 12, color: "var(--text-dim)", marginTop: 6 }}>{ytUpload.progress}% — this may take several minutes</div>
+              </div>
+            )}
+            {ytUpload?.state === "done" && (
+              <a href={ytUpload.url} target="_blank" rel="noreferrer" className="success-link">
+                <div><div className="success-link-label">Uploaded to YouTube</div><div className="success-link-url">{ytUpload.url}</div></div>
+                <Icon.External />
+              </a>
+            )}
+            {ytUpload?.state === "error" && <div className="alert alert-error">YouTube upload failed: {ytUpload.error}</div>}
+            {publishResults.youtube?.success === false && <div className="alert alert-error">YouTube: {publishResults.youtube.error}</div>}
             <div className="card" style={{ textAlign: "left", margin: 0, background: "var(--deep)" }}>
               <div className="preview-label">YouTube Description (with your business details)</div>
               <pre style={{ color: "var(--text)", fontSize: 12, whiteSpace: "pre-wrap", maxHeight: 160, overflow: "hidden", fontFamily: "'DM Sans',sans-serif", lineHeight: 1.7 }}>{generated?.yt?.description?.slice(0, 500)}...</pre>
@@ -617,10 +741,12 @@ function UploadWizard({ user, onSaveUser }) {
             <div className="alert alert-info" style={{ textAlign: "left", marginBottom: 20 }}>
               <strong>Next steps:</strong><br />
               1. Review & publish your WordPress draft at the link above<br />
-              2. Upload your video to YouTube, paste the copied description<br />
-              3. Set focus keyphrase: <em>wedding videographer {venue}</em>
+              {!user.youtube_access_token && <>2. Upload your video to YouTube, paste the copied description<br /></>}
+              {!user.youtube_access_token
+                ? <>3. Set focus keyphrase: <em>wedding videographer {venue}</em></>
+                : <>2. Set focus keyphrase in WordPress: <em>wedding videographer {venue}</em></>}
             </div>
-            <button className="btn btn-primary" onClick={() => { setWizardStep(1); setFile(null); setVenue(""); setAnswers({}); setGenerated(null); setPublishResults({}); }}>+ New Film</button>
+            <button className="btn btn-primary" onClick={() => { setWizardStep(1); setFile(null); setVenue(""); setAnswers({}); setGenerated(null); setPublishResults({}); setYtUpload(null); ytUploadStarted.current = false; }}>+ New Film</button>
           </div>
         </div>
       )}
@@ -653,6 +779,31 @@ function Settings({ user, onUpdate }) {
       onUpdate({ ...user, ...updated });
       setSaved(true); setTimeout(() => setSaved(false), 2500);
     } catch (e) { alert("Save failed: " + e.message); }
+    finally { setLoading(false); }
+  };
+
+  const connectYouTube = async () => {
+    try {
+      const res = await fetch("/api/youtube-auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "getAuthUrl" }),
+      });
+      const { url } = await res.json();
+      window.location.href = url;
+    } catch (e) { alert("Could not connect YouTube: " + e.message); }
+  };
+
+  const disconnectYouTube = async () => {
+    setLoading(true);
+    try {
+      await supabase.from("users").update({
+        youtube_access_token: null,
+        youtube_refresh_token: null,
+        youtube_channel_name: null,
+      }).eq("id", user.id);
+      onUpdate({ ...user, youtube_access_token: null, youtube_refresh_token: null, youtube_channel_name: null });
+    } catch (e) { alert("Failed to disconnect: " + e.message); }
     finally { setLoading(false); }
   };
 
@@ -692,6 +843,20 @@ function Settings({ user, onUpdate }) {
           <button className="btn btn-ghost btn-sm" onClick={testWP}>Test Connection</button>
           {testResult && <span style={{ fontSize: 12, color: testResult.startsWith("✓") ? "var(--green)" : "var(--red)" }}>{testResult}</span>}
         </div>
+      </div>
+      <div className="card">
+        <h2 className="card-title">YouTube</h2>
+        {user.youtube_channel_name ? (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span className="connected"><span className="status-dot green" />{user.youtube_channel_name}</span>
+            <button className="btn btn-ghost btn-sm" onClick={disconnectYouTube} disabled={loading}>Disconnect</button>
+          </div>
+        ) : (
+          <div>
+            <p style={{ color: "var(--text-dim)", fontSize: 13, marginBottom: 16 }}>Connect your YouTube channel to auto-upload wedding films directly from the app.</p>
+            <button className="btn btn-ghost" onClick={connectYouTube}><Icon.YouTube /> Connect YouTube</button>
+          </div>
+        )}
       </div>
       <button className="btn btn-primary" onClick={save} disabled={loading}>
         {loading ? <><div className="spinner" style={{ width: 14, height: 14 }} /> Saving...</> : saved ? "✓ Saved" : "Save Changes"}
@@ -756,6 +921,7 @@ export default function App() {
   const [authState, setAuthState] = useState("check");
   const [currentUser, setCurrentUser] = useState(null);
   const [page, setPage] = useState("upload");
+  const isYTCallback = window.location.pathname === "/youtube/callback" && new URLSearchParams(window.location.search).has("code");
 
   useEffect(() => {
     const restoreSession = async () => {
@@ -763,7 +929,7 @@ export default function App() {
         const session = JSON.parse(localStorage.getItem("filmpost_session") || "null");
         if (session?.userId) {
           const { data } = await supabase.from("users").select("*").eq("id", session.userId).single();
-          if (data) { setCurrentUser(data); setAuthState("app"); return; }
+          if (data) { setCurrentUser(data); setAuthState(isYTCallback ? "youtube_callback" : "app"); return; }
         }
       } catch (e) { /* session invalid */ }
       setAuthState("login");
@@ -779,11 +945,20 @@ export default function App() {
 
   if (authState === "check") return (
     <div style={{ minHeight: "100vh", background: "var(--black)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <style>{styles}</style>
       <div className="spinner" style={{ width: 40, height: 40, borderWidth: 3 }} />
     </div>
   );
   if (authState === "login") return <Login onLogin={u => { setCurrentUser(u); setAuthState("app"); }} onRegister={() => setAuthState("onboard")} />;
   if (authState === "onboard") return <Onboarding onComplete={u => { setCurrentUser(u); setAuthState("app"); }} />;
+  if (authState === "youtube_callback") return (
+    <YouTubeCallback user={currentUser} onComplete={u => {
+      setCurrentUser(u);
+      window.history.replaceState({}, "", "/");
+      setPage("settings");
+      setAuthState("app");
+    }} />
+  );
 
   return (
     <>
