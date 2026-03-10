@@ -267,7 +267,6 @@ export function HistoryPage({ posts, user }) {
                         <div className="upload-expanded">
                           <BlogRewriter
                             post={post}
-                            user={user}
                             onVersionSaved={handleVersionSaved}
                           />
                         </div>
