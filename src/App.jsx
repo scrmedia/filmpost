@@ -408,7 +408,7 @@ function YouTubeCallback({ user, onComplete }) {
       } catch (e) { setError(e.message); }
     };
     exchange();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--black)", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -935,7 +935,7 @@ export default function App() {
       setAuthState("login");
     };
     restoreSession();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const logout = () => {
     localStorage.removeItem("filmpost_session");
