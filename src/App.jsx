@@ -31,6 +31,7 @@ export default function App() {
     return stored ? JSON.parse(stored) : null;
   });
   const [page, setPage] = useState(() => isMobile() ? "history" : "dashboard");
+  const [uploadKey, setUploadKey] = useState(0);
   const [posts, setPosts] = useState([]);
   const [venues, setVenues] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -126,7 +127,7 @@ export default function App() {
       <div className="app-layout">
         <Sidebar
           currentPage={page}
-          setPage={setPage}
+          setPage={(p) => { if (p === "upload") setUploadKey(k => k + 1); setPage(p); }}
           user={user}
           onLogout={handleLogout}
         />
@@ -137,7 +138,7 @@ export default function App() {
           </div>
 
           {page === "dashboard" && <Dashboard user={user} posts={posts} setPage={setPage} />}
-          {page === "upload" && <UploadPage user={user} venues={venues} onSuccess={() => loadPosts(user.id)} onDone={() => { loadPosts(user.id); setPage("dashboard"); }} onVenueAdded={() => loadVenues(user.id)} />}
+          {page === "upload" && <UploadPage key={uploadKey} user={user} venues={venues} onSuccess={() => loadPosts(user.id)} onDone={() => { loadPosts(user.id); setPage("dashboard"); }} onVenueAdded={() => loadVenues(user.id)} />}
           {page === "history" && <HistoryPage posts={posts} user={user} />}
           {page === "venues" && <VenuePage user={user} posts={posts} venues={venues} onVenuesChange={() => loadVenues(user.id)} setPage={setPage} />}
           {page === "settings" && <SettingsPage user={user} onSaveUser={saveUser} />}

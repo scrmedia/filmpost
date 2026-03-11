@@ -167,7 +167,7 @@ export function UploadPage({ user, venues = [], onSuccess, onDone, onVenueAdded 
       ].filter(Boolean).join("\n") : "";
       const fullAnswersText = answersText + venueLibraryContext;
 
-      const title = await callClaude(systemPrompt, `Write a YouTube title for a wedding film at "${venueName}". Include the venue name. Keep it under 70 characters. Sound natural, not like a magazine headline. Return ONLY the title, no quotes.`);
+      const title = await callClaude(systemPrompt, `Write a YouTube title for a wedding film at "${venueName}".\n\n${fullAnswersText}\n\nInclude the venue name. If the questionnaire includes a couple's names, you may include them. Keep it under 70 characters. Sound natural, not like a magazine headline. Return ONLY the title, no quotes.`);
       setYoutubeTitle(title.trim());
 
       const footer = buildBusinessFooter(user);
