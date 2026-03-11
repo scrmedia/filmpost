@@ -1337,6 +1337,74 @@ export const styles = `
     flex-shrink: 0;
   }
 
+  /* Delete button — hidden until row is hovered */
+  .upload-item--deletable .upload-delete-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    flex-shrink: 0;
+    opacity: 0;
+    transition: opacity 0.15s, background 0.15s, color 0.15s;
+  }
+  .upload-item--deletable:hover .upload-delete-btn {
+    opacity: 1;
+  }
+  .upload-item--deletable .upload-delete-btn:hover {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--danger, #ef4444);
+  }
+
+  /* Delete confirmation dialog */
+  .delete-dialog-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+  .delete-dialog {
+    background: var(--surface-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius);
+    padding: 28px 32px;
+    width: 360px;
+    max-width: calc(100vw - 40px);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  }
+  .delete-dialog-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 8px;
+  }
+  .delete-dialog-body {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin: 0 0 24px;
+  }
+  .delete-dialog-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+  }
+  .btn-danger {
+    background: #ef4444;
+    color: #fff;
+    border: none;
+  }
+  .btn-danger:hover:not(:disabled) {
+    background: #dc2626;
+  }
+
   .upload-expanded {
     border-top: 1px solid var(--border-subtle);
     background: var(--surface);

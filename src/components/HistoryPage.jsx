@@ -202,10 +202,31 @@ function BlogRewriter({ post, onVersionSaved }) {
   );
 }
 
+// ── DeleteConfirmDialog ───────────────────────────────────────────────────────
+function DeleteConfirmDialog({ onCancel, onConfirm, deleting }) {
+  return (
+    <div className="delete-dialog-backdrop" onClick={onCancel}>
+      <div className="delete-dialog" onClick={e => e.stopPropagation()}>
+        <h3 className="delete-dialog-title">Delete this post?</h3>
+        <p className="delete-dialog-body">This cannot be undone.</p>
+        <div className="delete-dialog-actions">
+          <button className="btn btn-secondary" onClick={onCancel} disabled={deleting}>Cancel</button>
+          <button className="btn btn-danger" onClick={onConfirm} disabled={deleting}>
+            {deleting ? <span className="spinner" /> : "Delete"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── HistoryPage ───────────────────────────────────────────────────────────────
 export function HistoryPage({ posts, user }) {
   const [localPosts, setLocalPosts] = useState(posts);
   const [expandedId, setExpandedId] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(null); // { postId, message }
 
   // Keep in sync when App.jsx reloads posts (e.g. after a new upload).
   useEffect(() => { setLocalPosts(posts); }, [posts]);
@@ -217,6 +238,21 @@ export function HistoryPage({ posts, user }) {
         : p
       )
     );
+  };
+
+  const handleDeleteConfirm = async () => {
+    setDeleting(true);
+    setDeleteError(null);
+    const { error } = await supabase.from("posts").delete().eq("id", confirmDeleteId);
+    if (error == null) {
+      setLocalPosts(prev => prev.filter(p => p.id !== confirmDeleteId));
+      setConfirmDeleteId(null);
+      if (expandedId === confirmDeleteId) setExpandedId(null);
+    } else {
+      setDeleteError({ postId: confirmDeleteId, message: error.message || "Delete failed. Please try again." });
+      setConfirmDeleteId(null);
+    }
+    setDeleting(false);
   };
 
   return (
@@ -239,7 +275,7 @@ export function HistoryPage({ posts, user }) {
                   return (
                     <div key={post.id} className="upload-item-wrapper">
                       <div
-                        className={`upload-item${isExpanded ? " is-expanded" : ""}`}
+                        className={`upload-item upload-item--deletable${isExpanded ? " is-expanded" : ""}`}
                         style={{ cursor: "pointer" }}
                         onClick={() => setExpandedId(isExpanded ? null : post.id)}
                       >
@@ -258,10 +294,23 @@ export function HistoryPage({ posts, user }) {
                           <span className="status-dot"></span>
                           {post.status === "published" ? "Published" : post.status === "uploading" ? "Uploading" : "Draft"}
                         </div>
+                        <button
+                          className="upload-delete-btn"
+                          title="Delete post"
+                          onClick={e => { e.stopPropagation(); setConfirmDeleteId(post.id); setDeleteError(null); }}
+                        >
+                          <TrashIcon />
+                        </button>
                         <div className="upload-expand-chevron">
                           {isExpanded ? "▲" : "▼"}
                         </div>
                       </div>
+
+                      {deleteError?.postId === post.id && (
+                        <div className="alert alert-error" style={{ margin: "0 24px 12px" }}>
+                          {deleteError.message}
+                        </div>
+                      )}
 
                       {isExpanded && (
                         <div className="upload-expanded">
@@ -285,6 +334,25 @@ export function HistoryPage({ posts, user }) {
           </div>
         </div>
       </div>
+
+      {confirmDeleteId && (
+        <DeleteConfirmDialog
+          onCancel={() => setConfirmDeleteId(null)}
+          onConfirm={handleDeleteConfirm}
+          deleting={deleting}
+        />
+      )}
     </>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="3 6 5 6 21 6"/>
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+      <path d="M10 11v6M14 11v6"/>
+      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+    </svg>
   );
 }
