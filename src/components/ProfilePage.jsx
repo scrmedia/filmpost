@@ -11,9 +11,9 @@ const SEO_PLUGINS = [
 ];
 
 const PLATFORMS = [
-  { value: "", label: "Select platform…" },
-  { value: "wordpress", label: "WordPress" },
-  { value: "squarespace", label: "Squarespace" },
+  { value: "wordpress",   label: "WordPress",   icon: "WordPress" },
+  { value: "squarespace", label: "Squarespace", icon: "Squarespace" },
+  { value: "wix",         label: "Wix",         icon: "Wix" },
 ];
 
 export function ProfilePage({ user, onUpdate }) {
@@ -119,9 +119,22 @@ export function ProfilePage({ user, onUpdate }) {
             <div className="grid-2">
               <div className="field">
                 <label className="label">Publishing Platform</label>
-                <select className="input" value={form.platform} onChange={e => update("platform", e.target.value)}>
-                  {PLATFORMS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-                </select>
+                <div className="platform-picker">
+                  {PLATFORMS.map(p => {
+                    const LogoIcon = Icon[p.icon];
+                    return (
+                      <button
+                        key={p.value}
+                        type="button"
+                        className={`platform-card${form.platform === p.value ? " platform-card--selected" : ""}`}
+                        onClick={() => update("platform", p.value)}
+                      >
+                        <LogoIcon />
+                        <span>{p.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
               <div className="field">
                 <label className="label">SEO Plugin <span className="label-hint">(WordPress only)</span></label>

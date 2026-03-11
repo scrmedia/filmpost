@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { Icon } from "../icons";
 import { supabase, VENUE_QUESTIONS, buildBusinessFooter, callClaude } from "../utils";
 import { SquarespaceExport } from "./SquarespaceExport";
+import { WixExport } from "./WixExport";
 
 const CHUNK_SIZE = 4 * 1024 * 1024; // 4 MB
 
@@ -29,9 +30,10 @@ export function UploadPage({ user, onSuccess, onDone }) {
   const [ytUpload, setYtUpload] = useState({ state: "idle", progress: 0, videoId: null, error: null });
   const [savedPostId, setSavedPostId] = useState(null);
 
-  // Squarespace export panel
+  // CMS export panels (Squarespace / Wix)
   const [ssOpen, setSsOpen] = useState(false);
-  const [ssPublished, setSsPublished] = useState(false);
+  const [wixOpen, setWixOpen] = useState(false);
+  const [cmsPublished, setCmsPublished] = useState(""); // CMS name shown in success message
 
   // Done button countdown (starts after YouTube upload completes)
   const [countdown, setCountdown] = useState(null); // null = not started, >0 = counting, 0 = ready
@@ -562,15 +564,19 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
                   <button className="btn btn-primary btn-lg" onClick={() => setSsOpen(true)}>
                     Export for Squarespace <Icon.Arrow />
                   </button>
+                ) : user?.platform === "wix" ? (
+                  <button className="btn btn-primary btn-lg" onClick={() => setWixOpen(true)}>
+                    Export for Wix <Icon.Arrow />
+                  </button>
                 ) : (
                   <button className="btn btn-primary btn-lg" onClick={publishContent}>
                     Publish Now <Icon.Arrow />
                   </button>
                 )}
               </div>
-              {ssPublished && (
+              {cmsPublished && (
                 <div className="alert alert-success" style={{ marginTop: 16 }}>
-                  Post marked as published in Squarespace.
+                  Post marked as published in {cmsPublished}.
                 </div>
               )}
             </div>
@@ -705,11 +711,19 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
           heroImagePreview={heroImagePreview}
           savedPostId={savedPostId}
           onClose={() => setSsOpen(false)}
-          onPublished={() => {
-            setSsOpen(false);
-            setSsPublished(true);
-            onSuccess?.();
-          }}
+          onPublished={() => { setSsOpen(false); setCmsPublished("Squarespace"); onSuccess?.(); }}
+        />
+      )}
+      {wixOpen && (
+        <WixExport
+          venueName={venueName}
+          youtubeTitle={youtubeTitle}
+          blogContent={blogContent}
+          youtubeDesc={youtubeDesc}
+          heroImagePreview={heroImagePreview}
+          savedPostId={savedPostId}
+          onClose={() => setWixOpen(false)}
+          onPublished={() => { setWixOpen(false); setCmsPublished("Wix"); onSuccess?.(); }}
         />
       )}
     </>

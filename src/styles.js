@@ -1820,6 +1820,42 @@ export const styles = `
     }
   }
 
+  /* ── Platform picker (ProfilePage + Onboarding) ──────────── */
+
+  .platform-picker {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .platform-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 18px;
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 500;
+    min-width: 90px;
+    transition: var(--transition);
+  }
+
+  .platform-card:hover {
+    border-color: var(--text-muted);
+    color: var(--text-primary);
+  }
+
+  .platform-card--selected {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-muted);
+  }
+
   /* ── Squarespace Export Panel ─────────────────────────────── */
 
   .ss-backdrop {

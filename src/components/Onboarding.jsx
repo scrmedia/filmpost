@@ -2,6 +2,13 @@ import { useState, useEffect, useRef } from "react";
 import bcrypt from "bcryptjs";
 import { supabase } from "../utils";
 import { BusinessProfileFields } from "./BusinessProfileFields";
+import { Icon } from "../icons";
+
+const CMS_OPTIONS = [
+  { value: "wordpress",   label: "WordPress",   icon: "WordPress" },
+  { value: "squarespace", label: "Squarespace", icon: "Squarespace" },
+  { value: "wix",         label: "Wix",         icon: "Wix" },
+];
 
 // Extract the 11-character YouTube video ID from any common YouTube URL format.
 function extractYouTubeId(url) {
@@ -18,7 +25,7 @@ export function Onboarding({ onComplete }) {
   const [form, setForm] = useState({
     name: "", email: "", password: "", business_name: "",
     tagline: "", enquiry_email: "", website: "", instagram: "", tiktok: "", facebook: "",
-    wp_url: "", wp_user: "", wp_pass: "",
+    wp_url: "", wp_user: "", wp_pass: "", platform: "",
   });
   const [createdUser, setCreatedUser] = useState(null); // set after account creation, used in step 3
   const [error, setError] = useState("");
@@ -194,7 +201,15 @@ export function Onboarding({ onComplete }) {
     }
   };
 
-  const finish = () => onComplete(createdUser);
+  const finish = async () => {
+    const finalUser = { ...createdUser };
+    if (form.platform && createdUser?.id) {
+      await supabase.from("users").update({ platform: form.platform }).eq("id", createdUser.id);
+      finalUser.platform = form.platform;
+      localStorage.setItem("filmpost_user", JSON.stringify(finalUser));
+    }
+    onComplete(finalUser);
+  };
 
   // ── Part 4: build embed URL ─────────────────────────────────────────────────
   const videoId = currentFilm ? extractYouTubeId(currentFilm.youtube_url) : null;
@@ -286,7 +301,29 @@ export function Onboarding({ onComplete }) {
                     Connect your publishing channels. You can also do this later in Settings.
                   </p>
 
-                  {/* WordPress */}
+                  {/* Platform selector */}
+                  <div style={{ marginBottom: 24 }}>
+                    <div className="label" style={{ marginBottom: 12 }}>Your Website Platform</div>
+                    <div className="platform-picker">
+                      {CMS_OPTIONS.map(opt => {
+                        const LogoIcon = Icon[opt.icon];
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            className={`platform-card${form.platform === opt.value ? " platform-card--selected" : ""}`}
+                            onClick={() => update("platform", opt.value)}
+                          >
+                            <LogoIcon />
+                            <span>{opt.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* WordPress credentials — shown only when WordPress selected */}
+                  {form.platform === "wordpress" && (
                   <div style={{ marginBottom: 24 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                       <span className="label" style={{ marginBottom: 0 }}>WordPress Site</span>
@@ -308,6 +345,7 @@ export function Onboarding({ onComplete }) {
                       <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{form.wp_url}</div>
                     )}
                   </div>
+                  )}
 
                   {/* YouTube */}
                   <div style={{ marginBottom: 24 }}>
