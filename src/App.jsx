@@ -46,18 +46,12 @@ export default function App() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadPosts = async (userId) => {
-    console.log("[FilmPost] loadPosts called with userId:", userId);
     const { data, error } = await supabase
       .from("posts")
       .select("*")
       .eq("user_id", userId)
       .order("created_at", { ascending: false });
-    console.log("[FilmPost] loadPosts result — rows:", data?.length, "error:", error?.message, error?.code);
-    if (error) {
-      console.error("[FilmPost] loadPosts FAILED:", error.message, error.details, error.hint, error.code);
-    } else {
-      setPosts(data || []);
-    }
+    if (error == null) setPosts(data || []);
   };
 
   const handleLogin = (u) => {

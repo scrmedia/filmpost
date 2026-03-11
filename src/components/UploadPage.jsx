@@ -180,21 +180,12 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
           blog_content: blog.trim(),
           status: "draft",
         };
-        console.log("[FilmPost] Inserting post to Supabase:", insertPayload);
         const { data: post, error: insertError } = await supabase
           .from("posts")
           .insert([insertPayload])
           .select()
           .single();
-        console.log("[FilmPost] Supabase insert result — data:", post, "error:", insertError);
-        if (insertError) {
-          console.error("[FilmPost] Supabase insert FAILED:", insertError.message, insertError.details, insertError.hint, insertError.code);
-        } else if (post?.id) {
-          console.log("[FilmPost] Post saved with id:", post.id);
-          setSavedPostId(post.id);
-        } else {
-          console.warn("[FilmPost] Insert returned no error but data is empty:", post);
-        }
+        if (insertError == null && post?.id) setSavedPostId(post.id);
       } catch (e) {
         console.error("[FilmPost] Exception during post insert:", e.message);
       }
