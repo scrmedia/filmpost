@@ -2813,6 +2813,174 @@ export const styles = `
     font-style: italic;
   }
 
+  /* YouTube link and keyword in history row */
+  .upload-yt-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 4px;
+    min-height: 18px;
+  }
+
+  .upload-yt-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 500;
+    transition: opacity 0.15s;
+  }
+
+  .upload-yt-link:hover { opacity: 0.75; }
+
+  .upload-yt-link svg { width: 13px; height: 13px; }
+
+  .upload-yt-pending {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
+  .upload-meta-keyword {
+    color: var(--text-secondary);
+    font-style: italic;
+    font-size: 11px;
+  }
+
+  /* PostInfo section (YouTube full link, SEO data, featured films) */
+  .post-info-section {
+    padding: 16px 24px 0;
+    border-bottom: 1px solid var(--border-subtle);
+    margin-bottom: 4px;
+  }
+
+  .post-info-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding-bottom: 14px;
+  }
+
+  .post-info-yt-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--accent);
+    text-decoration: none;
+    transition: opacity 0.15s;
+  }
+
+  .post-info-yt-link:hover { opacity: 0.75; }
+
+  .post-info-yt-link svg { width: 15px; height: 15px; }
+
+  .post-info-yt-pending {
+    font-size: 13px;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
+  .post-info-toggle {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-secondary);
+    font-size: 12px;
+    padding: 3px 10px;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+  }
+
+  .post-info-toggle:hover {
+    border-color: var(--accent);
+    color: var(--text);
+  }
+
+  /* SEO data panel */
+  .post-seo-data {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 0 14px;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .post-seo-field {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    gap: 8px;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .post-seo-label {
+    color: var(--text-muted);
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+
+  .post-seo-value {
+    color: var(--text);
+    word-break: break-word;
+  }
+
+  /* Featured films panel (roundup posts) */
+  .post-featured-films {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 0 14px;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .post-featured-film {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 10px;
+    background: var(--surface-elevated);
+    border-radius: 6px;
+    font-size: 13px;
+  }
+
+  .post-featured-film-venue {
+    color: var(--text);
+    font-weight: 500;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .post-featured-film-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    color: var(--accent);
+    text-decoration: none;
+    flex-shrink: 0;
+    font-weight: 500;
+    transition: opacity 0.15s;
+  }
+
+  .post-featured-film-link:hover { opacity: 0.75; }
+
+  .post-featured-film-link svg { width: 12px; height: 12px; }
+
+  .post-featured-film-no-yt {
+    font-size: 12px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+
   /* Area Roundup badge in History */
   .roundup-badge {
     display: inline-block;

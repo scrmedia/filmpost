@@ -198,6 +198,7 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
             blog_content: processedBlog,
             status: "draft",
             post_type: "roundup",
+            featured_post_ids: selectedPostIds,
           }])
           .select()
           .single();

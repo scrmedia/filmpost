@@ -3,24 +3,20 @@ import { Icon } from "../icons";
 import { supabase, callClaude } from "../utils";
 
 // ── Diff engine ───────────────────────────────────────────────────────────────
-// Strips HTML tags and normalises whitespace for plain-text diffing.
 function stripHtml(html) {
   return (html || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
-// Tokenises text into words and whitespace runs so both are preserved in output.
 function tokenize(text) {
   return text.match(/\S+|\s+/g) || [];
 }
 
-// Word-level LCS diff. Returns array of { t: '='|'+'|'-', s: string }.
 function diffWords(oldText, newText) {
   const a = tokenize(oldText);
   const b = tokenize(newText);
   const m = a.length;
   const n = b.length;
 
-  // Build LCS DP table using flat Uint32Array for efficiency.
   const dp = new Uint32Array((m + 1) * (n + 1));
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
@@ -30,7 +26,6 @@ function diffWords(oldText, newText) {
     }
   }
 
-  // Backtrack to produce diff operations.
   const ops = [];
   let i = m, j = n;
   while (i > 0 || j > 0) {
@@ -45,15 +40,123 @@ function diffWords(oldText, newText) {
   return ops;
 }
 
+// ── SEO block parser ──────────────────────────────────────────────────────────
+// Extracts key/value pairs from the plugin comment block appended to blog_content.
+function parseSeoBlock(blogContent, plugin) {
+  if (!plugin || !blogContent) return null;
+  const tags = {
+    yoast:    ["<!-- YOAST SEO -->",       "<!-- END YOAST SEO -->"],
+    rankmath: ["<!-- RANK MATH SEO -->",   "<!-- END RANK MATH SEO -->"],
+    aioseo:   ["<!-- ALL IN ONE SEO -->",  "<!-- END ALL IN ONE SEO -->"],
+  };
+  const [startTag, endTag] = tags[plugin] || [];
+  if (!startTag) return null;
+  const start = blogContent.indexOf(startTag);
+  const end   = blogContent.indexOf(endTag);
+  if (start === -1 || end === -1) return null;
+  const block = blogContent.slice(start + startTag.length, end).trim();
+  const fields = {};
+  block.split("\n").forEach(line => {
+    const colonIdx = line.indexOf(":");
+    if (colonIdx === -1) return;
+    const key   = line.slice(0, colonIdx).trim();
+    const value = line.slice(colonIdx + 1).trim();
+    if (key && value) fields[key] = value;
+  });
+  return Object.keys(fields).length > 0 ? fields : null;
+}
+
+// ── PostInfo ──────────────────────────────────────────────────────────────────
+// Shows YouTube link, optional SEO data, and featured films for roundup posts.
+function PostInfo({ post, allPosts, seoPlugin }) {
+  const [seoOpen, setSeoOpen]     = useState(false);
+  const [filmsOpen, setFilmsOpen] = useState(false);
+
+  const seoData = parseSeoBlock(post.blog_content, seoPlugin);
+  const featuredPosts = (post.featured_post_ids || [])
+    .map(id => allPosts.find(p => p.id === id))
+    .filter(Boolean);
+
+  return (
+    <div className="post-info-section">
+      <div className="post-info-row">
+        {/* YouTube link or status */}
+        {post.yt_url ? (
+          <a
+            href={post.yt_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="post-info-yt-link"
+          >
+            <Icon.YouTube /> Watch on YouTube
+          </a>
+        ) : (
+          <span className="post-info-yt-pending">
+            {post.status === "uploading" ? "YouTube upload in progress" : "No YouTube link"}
+          </span>
+        )}
+
+        {/* SEO data toggle */}
+        {seoData && (
+          <button className="post-info-toggle" onClick={() => setSeoOpen(o => !o)}>
+            SEO Data {seoOpen ? "▲" : "▼"}
+          </button>
+        )}
+
+        {/* Featured films toggle (roundup only) */}
+        {featuredPosts.length > 0 && (
+          <button className="post-info-toggle" onClick={() => setFilmsOpen(o => !o)}>
+            {featuredPosts.length} Featured Film{featuredPosts.length !== 1 ? "s" : ""} {filmsOpen ? "▲" : "▼"}
+          </button>
+        )}
+      </div>
+
+      {/* SEO fields */}
+      {seoOpen && seoData && (
+        <div className="post-seo-data">
+          {Object.entries(seoData).map(([key, value]) => (
+            <div key={key} className="post-seo-field">
+              <span className="post-seo-label">{key}</span>
+              <span className="post-seo-value">{value}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Featured films list */}
+      {filmsOpen && featuredPosts.length > 0 && (
+        <div className="post-featured-films">
+          {featuredPosts.map(fp => (
+            <div key={fp.id} className="post-featured-film">
+              <span className="post-featured-film-venue">{fp.venue || "Unknown venue"}</span>
+              {fp.yt_url ? (
+                <a
+                  href={fp.yt_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="post-featured-film-link"
+                >
+                  <Icon.YouTube /> Watch
+                </a>
+              ) : (
+                <span className="post-featured-film-no-yt">No video</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── BlogRewriter ──────────────────────────────────────────────────────────────
 function BlogRewriter({ post, onVersionSaved }) {
   const [instruction, setInstruction] = useState("");
   const [loading, setLoading] = useState(false);
-  const [pending, setPending] = useState(null); // { content: string, diff: op[] }
+  const [pending, setPending] = useState(null);
   const [showVersions, setShowVersions] = useState(false);
   const [error, setError] = useState("");
 
-  // Synthesise v1 from blog_content for posts saved before version tracking existed.
   const versions = post.blog_versions?.length > 0
     ? post.blog_versions
     : [{ v: 1, content: post.blog_content, saved_at: post.created_at }];
@@ -106,8 +209,6 @@ function BlogRewriter({ post, onVersionSaved }) {
 
   return (
     <div className="blog-rewriter">
-
-      {/* Current blog content + version history toggle */}
       <div className="blog-rewriter-section">
         <div className="blog-rewriter-label">
           <span>Blog post</span>
@@ -145,7 +246,6 @@ function BlogRewriter({ post, onVersionSaved }) {
         />
       </div>
 
-      {/* Pending diff view */}
       {pending && (
         <div className="diff-view">
           <div className="diff-header">
@@ -174,7 +274,6 @@ function BlogRewriter({ post, onVersionSaved }) {
         </div>
       )}
 
-      {/* Tweak input — hidden while a diff is pending */}
       {!pending && (
         <div className="tweak-section">
           <label className="label">Tweak blog post</label>
@@ -228,7 +327,6 @@ export function HistoryPage({ posts, user }) {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null); // { postId, message }
 
-  // Keep in sync when App.jsx reloads posts (e.g. after a new upload).
   useEffect(() => { setLocalPosts(posts); }, [posts]);
 
   const handleVersionSaved = (postId, newContent, newVersions) => {
@@ -272,6 +370,7 @@ export function HistoryPage({ posts, user }) {
                 {localPosts.map((post) => {
                   const isExpanded = expandedId === post.id;
                   const versionCount = post.blog_versions?.length || 0;
+                  const isRoundup = post.post_type === "roundup";
                   return (
                     <div key={post.id} className="upload-item-wrapper">
                       <div
@@ -283,12 +382,31 @@ export function HistoryPage({ posts, user }) {
                         <div className="upload-info">
                           <div className="upload-title">{post.yt_title || "Untitled"}</div>
                           <div className="upload-meta">
-                            {post.post_type === "roundup" && <span className="roundup-badge">Area Roundup</span>}
+                            {isRoundup && <span className="roundup-badge">Area Roundup</span>}
                             <span>{post.venue}</span>
+                            {isRoundup && post.target_keyword && (
+                              <span className="upload-meta-keyword">{post.target_keyword}</span>
+                            )}
                             <span>{new Date(post.created_at).toLocaleDateString()}</span>
                             {versionCount > 1 && (
                               <span style={{ color: "var(--accent)" }}>v{versionCount}</span>
                             )}
+                          </div>
+                          {/* YouTube link — always visible in row */}
+                          <div className="upload-yt-row">
+                            {post.yt_url ? (
+                              <a
+                                href={post.yt_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="upload-yt-link"
+                                onClick={e => e.stopPropagation()}
+                              >
+                                <Icon.YouTube /> Watch on YouTube
+                              </a>
+                            ) : post.status === "uploading" ? (
+                              <span className="upload-yt-pending">Upload pending</span>
+                            ) : null}
                           </div>
                         </div>
                         <div className={`upload-status ${post.status === "published" ? "published" : post.status === "uploading" ? "processing" : "draft"}`}>
@@ -315,6 +433,11 @@ export function HistoryPage({ posts, user }) {
 
                       {isExpanded && (
                         <div className="upload-expanded">
+                          <PostInfo
+                            post={post}
+                            allPosts={localPosts}
+                            seoPlugin={user?.seo_plugin}
+                          />
                           <BlogRewriter
                             post={post}
                             onVersionSaved={handleVersionSaved}
