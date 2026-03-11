@@ -172,17 +172,31 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
 
       // Save history entry immediately — before any publish attempt
       try {
-        const { data: post } = await supabase.from("posts").insert([{
+        const insertPayload = {
           user_id: user.id,
           venue_name: venueName,
           youtube_title: title.trim(),
           youtube_description: desc.trim(),
           blog_content: blog.trim(),
           status: "draft",
-        }]).select().single();
-        if (post?.id) setSavedPostId(post.id);
+        };
+        console.log("[FilmPost] Inserting post to Supabase:", insertPayload);
+        const { data: post, error: insertError } = await supabase
+          .from("posts")
+          .insert([insertPayload])
+          .select()
+          .single();
+        console.log("[FilmPost] Supabase insert result — data:", post, "error:", insertError);
+        if (insertError) {
+          console.error("[FilmPost] Supabase insert FAILED:", insertError.message, insertError.details, insertError.hint, insertError.code);
+        } else if (post?.id) {
+          console.log("[FilmPost] Post saved with id:", post.id);
+          setSavedPostId(post.id);
+        } else {
+          console.warn("[FilmPost] Insert returned no error but data is empty:", post);
+        }
       } catch (e) {
-        console.error("Failed to save post history:", e.message);
+        console.error("[FilmPost] Exception during post insert:", e.message);
       }
 
       setStep(3);
