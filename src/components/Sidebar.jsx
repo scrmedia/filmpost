@@ -5,6 +5,7 @@ export function Sidebar({ currentPage, setPage, user, onLogout }) {
     { id: "dashboard", label: "Dashboard", icon: Icon.Dashboard },
     { id: "upload", label: "New Upload", icon: Icon.Upload },
     { id: "history", label: "History", icon: Icon.History },
+    { id: "venues", label: "Venues", icon: Icon.MapPin },
     { id: "settings", label: "Settings", icon: Icon.Settings },
     { id: "profile", label: "Profile", icon: Icon.User },
   ];

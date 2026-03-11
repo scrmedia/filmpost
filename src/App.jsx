@@ -9,6 +9,7 @@ import { UploadPage } from "./components/UploadPage";
 import { HistoryPage } from "./components/HistoryPage";
 import { SettingsPage } from "./components/SettingsPage";
 import { ProfilePage } from "./components/ProfilePage";
+import { VenuePage } from "./components/VenuePage";
 import { YouTubeCallback } from "./components/YouTubeCallback";
 
 const isYTCallback = window.location.pathname === "/youtube/callback";
@@ -31,6 +32,7 @@ export default function App() {
   });
   const [page, setPage] = useState(() => isMobile() ? "history" : "dashboard");
   const [posts, setPosts] = useState([]);
+  const [venues, setVenues] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // On mobile, redirect away from upload (and dashboard) to history
@@ -41,7 +43,7 @@ export default function App() {
   }, [page]);
 
   useEffect(() => {
-    if (user) loadPosts(user.id);
+    if (user) { loadPosts(user.id); loadVenues(user.id); }
     setLoading(false);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -54,10 +56,20 @@ export default function App() {
     if (error == null) setPosts(data || []);
   };
 
+  const loadVenues = async (userId) => {
+    const { data, error } = await supabase
+      .from("venues")
+      .select("*")
+      .eq("user_id", userId)
+      .order("venue_name");
+    if (error == null) setVenues(data || []);
+  };
+
   const handleLogin = (u) => {
     setUser(u);
     localStorage.setItem("filmpost_user", JSON.stringify(u));
     loadPosts(u.id);
+    loadVenues(u.id);
   };
 
   const handleLogout = () => {
@@ -125,8 +137,9 @@ export default function App() {
           </div>
 
           {page === "dashboard" && <Dashboard user={user} posts={posts} setPage={setPage} />}
-          {page === "upload" && <UploadPage user={user} onSuccess={() => loadPosts(user.id)} onDone={() => { loadPosts(user.id); setPage("dashboard"); }} />}
+          {page === "upload" && <UploadPage user={user} venues={venues} onSuccess={() => loadPosts(user.id)} onDone={() => { loadPosts(user.id); setPage("dashboard"); }} onVenueAdded={() => loadVenues(user.id)} />}
           {page === "history" && <HistoryPage posts={posts} user={user} />}
+          {page === "venues" && <VenuePage user={user} posts={posts} venues={venues} onVenuesChange={() => loadVenues(user.id)} setPage={setPage} />}
           {page === "settings" && <SettingsPage user={user} onSaveUser={saveUser} />}
           {page === "profile" && <ProfilePage user={user} onUpdate={saveUser} />}
         </main>

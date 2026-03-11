@@ -4,12 +4,13 @@ import { supabase, VENUE_QUESTIONS, buildBusinessFooter, callClaude } from "../u
 import { SquarespaceExport } from "./SquarespaceExport";
 import { WixExport } from "./WixExport";
 import { PixiesetExport } from "./PixiesetExport";
+import { VenueFormPanel } from "./VenueFormPanel";
 
 const CHUNK_SIZE = 4 * 1024 * 1024; // 4 MB
 
 const PROCESSING_DELAY = 120; // seconds to wait after YouTube upload completes
 
-export function UploadPage({ user, onSuccess, onDone }) {
+export function UploadPage({ user, venues = [], onSuccess, onDone, onVenueAdded }) {
   const [step, setStep] = useState(1);
   const [file, setFile] = useState(null);
   const [venueName, setVenueName] = useState("");
@@ -30,6 +31,13 @@ export function UploadPage({ user, onSuccess, onDone }) {
   const [ytUploadUri, setYtUploadUri] = useState(null);
   const [ytUpload, setYtUpload] = useState({ state: "idle", progress: 0, videoId: null, error: null });
   const [savedPostId, setSavedPostId] = useState(null);
+
+  // Venue library
+  const [venueQuery, setVenueQuery] = useState("");
+  const [showVenueSuggestions, setShowVenueSuggestions] = useState(false);
+  const [selectedLibraryVenue, setSelectedLibraryVenue] = useState(null);
+  const [showSaveBanner, setShowSaveBanner] = useState(false);
+  const [saveVenueOpen, setSaveVenueOpen] = useState(false);
 
   // CMS export panels (Squarespace / Wix)
   const [ssOpen, setSsOpen] = useState(false);
@@ -81,11 +89,22 @@ export function UploadPage({ user, onSuccess, onDone }) {
       const systemPrompt = `You are a wedding videographer writing about your own work. Write like a real person who films weddings for a living — warm, genuine, and specific to the day. Use plain British English. No fancy words, no flowery language, no corporate tone. Write short sentences. Be direct. Sound human. Never use these words or phrases: breathtaking, stunning, magical, timeless, seamlessly, meticulously, elegant, bespoke, enchanting, nestled, picturesque, idyllic, effortlessly, truly, really special, or any em dashes (—).${toneInstruction}`;
       const answersText = VENUE_QUESTIONS.map(q => venueAnswers[q.id] ? `${q.label}: ${venueAnswers[q.id]}` : "").filter(Boolean).join("\n");
 
+      // Enrich prompt with saved venue library details if a library venue was selected
+      const venueLibraryContext = selectedLibraryVenue ? [
+        "\n\nAdditional venue details from saved library:",
+        selectedLibraryVenue.venue_type && `Venue type: ${selectedLibraryVenue.venue_type}`,
+        selectedLibraryVenue.location && `Location: ${selectedLibraryVenue.location}`,
+        selectedLibraryVenue.indoor_outdoor && `Setting: ${selectedLibraryVenue.indoor_outdoor}`,
+        selectedLibraryVenue.capacity && `Capacity: ${selectedLibraryVenue.capacity}`,
+        selectedLibraryVenue.general_notes && `General notes: ${selectedLibraryVenue.general_notes}`,
+      ].filter(Boolean).join("\n") : "";
+      const fullAnswersText = answersText + venueLibraryContext;
+
       const title = await callClaude(systemPrompt, `Write a YouTube title for a wedding film at "${venueName}". Include the venue name. Keep it under 70 characters. Sound natural, not like a magazine headline. Return ONLY the title, no quotes.`);
       setYoutubeTitle(title.trim());
 
       const footer = buildBusinessFooter(user);
-      const desc = await callClaude(systemPrompt, `Write a YouTube description for this wedding film:\nVenue: ${venueName}\n${answersText}\n\nStart with a short, natural opening sentence or two about the day — written like a videographer talking about a wedding they genuinely loved filming. Then cover the filming highlights in plain, specific language. No em dashes. No fancy adjectives. Just honest, warm copy.\n\nEnd with this exact footer:\n\n${footer}\n\nUnder 4000 characters. Return ONLY the description text.`);
+      const desc = await callClaude(systemPrompt, `Write a YouTube description for this wedding film:\nVenue: ${venueName}\n${fullAnswersText}\n\nStart with a short, natural opening sentence or two about the day — written like a videographer talking about a wedding they genuinely loved filming. Then cover the filming highlights in plain, specific language. No em dashes. No fancy adjectives. Just honest, warm copy.\n\nEnd with this exact footer:\n\n${footer}\n\nUnder 4000 characters. Return ONLY the description text.`);
       setYoutubeDesc(desc.trim());
 
       const seoPlugin = user?.seo_plugin || "";
@@ -125,7 +144,7 @@ Slug: [url-friendly, lowercase, hyphens, no domain]
       const businessUrl = user?.website || "";
       const blog = await callClaude(systemPrompt, `Write an SEO-optimised blog post (900-1200 words) for a wedding videographer's website about filming a wedding at "${venueName}".
 
-${answersText}
+${fullAnswersText}
 
 Write like a videographer who was actually there. Use plain, conversational British English. Short paragraphs. Short sentences. No em dashes. No words like stunning, magical, breathtaking, timeless, seamlessly, meticulously, nestled, or picturesque.
 
@@ -198,6 +217,10 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
       } catch (e) {
         console.error("[FilmPost] Exception during post insert:", e.message);
       }
+
+      // Show save-to-library banner if this venue isn't already in the library
+      const alreadySaved = venues.some(v => v.venue_name.toLowerCase() === venueName.toLowerCase());
+      if (!alreadySaved) setShowSaveBanner(true);
 
       setStep(3);
     } catch (e) {
@@ -482,7 +505,59 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
             <div className="card-body">
               <div className="field">
                 <label className="label">Venue Name</label>
-                <input className="input" value={venueName} onChange={e => setVenueName(e.target.value)} placeholder="e.g. Aynhoe Park" />
+                <div className="venue-autocomplete">
+                  <input
+                    className="input"
+                    value={venueQuery || venueName}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setVenueQuery(val);
+                      setVenueName(val);
+                      setSelectedLibraryVenue(null);
+                      setShowVenueSuggestions(val.length >= 1);
+                    }}
+                    onFocus={() => { if ((venueQuery || venueName).length >= 1) setShowVenueSuggestions(true); }}
+                    onBlur={() => setTimeout(() => setShowVenueSuggestions(false), 150)}
+                    placeholder="e.g. Aynhoe Park"
+                    autoComplete="off"
+                  />
+                  {showVenueSuggestions && venues.filter(v =>
+                    v.venue_name.toLowerCase().includes((venueQuery || venueName).toLowerCase())
+                  ).length > 0 && (
+                    <div className="venue-suggestions">
+                      {venues.filter(v =>
+                        v.venue_name.toLowerCase().includes((venueQuery || venueName).toLowerCase())
+                      ).map(v => (
+                        <div
+                          key={v.id}
+                          className="venue-suggestion-item"
+                          onMouseDown={() => {
+                            setVenueName(v.venue_name);
+                            setVenueQuery(v.venue_name);
+                            setSelectedLibraryVenue(v);
+                            setShowVenueSuggestions(false);
+                            // Pre-fill questionnaire answers from library
+                            setVenueAnswers(prev => ({
+                              ...prev,
+                              lightingNotes: v.lighting_notes || prev.lightingNotes || "",
+                              filmingHighlights: v.filming_highlights || prev.filmingHighlights || "",
+                              venueWebsite: v.website_url || prev.venueWebsite || "",
+                              venueStyle: v.style_notes || (v.venue_type ? `${v.venue_type} venue` : prev.venueStyle || ""),
+                            }));
+                          }}
+                        >
+                          <div className="venue-suggestion-name">{v.venue_name}</div>
+                          {v.location && <div className="venue-suggestion-location">{v.location}</div>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {selectedLibraryVenue && (
+                  <div className="venue-selected-tag">
+                    <Icon.MapPin /> From your Venue Library — questionnaire pre-filled
+                  </div>
+                )}
               </div>
               {VENUE_QUESTIONS.map(q => (
                 <div className="field" key={q.id}>
@@ -541,6 +616,19 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
         )}
 
         {/* Step 3 — Review & Edit */}
+        {step === 3 && showSaveBanner && (
+          <div className="venue-save-banner">
+            <div className="venue-save-banner-text">
+              <Icon.MapPin />
+              <span>Want to save <strong>{venueName}</strong> to your Venue Library for next time?</span>
+            </div>
+            <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+              <button className="btn btn-secondary" style={{ padding: "6px 14px", fontSize: 13 }} onClick={() => setShowSaveBanner(false)}>Dismiss</button>
+              <button className="btn btn-primary" style={{ padding: "6px 14px", fontSize: 13 }} onClick={() => setSaveVenueOpen(true)}>Quick Add</button>
+            </div>
+          </div>
+        )}
+
         {step === 3 && (
           <div className="card">
             <div className="card-header"><h3 className="card-title">Review Your Content</h3></div>
@@ -742,6 +830,14 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
           savedPostId={savedPostId}
           onClose={() => setPixiesetOpen(false)}
           onPublished={() => { setPixiesetOpen(false); setCmsPublished("Pixieset"); onSuccess?.(); }}
+        />
+      )}
+      {saveVenueOpen && (
+        <VenueFormPanel
+          prefillName={venueName}
+          userId={user.id}
+          onClose={() => setSaveVenueOpen(false)}
+          onSaved={() => { setSaveVenueOpen(false); setShowSaveBanner(false); onVenueAdded?.(); }}
         />
       )}
     </>
