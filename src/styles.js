@@ -531,7 +531,7 @@ export const styles = `
   /* Quick Actions */
   .quick-actions {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: 16px;
   }
   
@@ -2711,5 +2711,121 @@ export const styles = `
     grid-template-columns: 1fr 1fr;
     gap: 10px 16px;
     margin-top: 4px;
+  }
+
+  /* Roundup post selector grid */
+  .roundup-post-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+  }
+
+  .roundup-post-card {
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    position: relative;
+    background: var(--surface);
+    user-select: none;
+  }
+
+  .roundup-post-card:hover {
+    border-color: var(--accent);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  }
+
+  .roundup-post-card--selected {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  }
+
+  .roundup-post-card--disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  .roundup-post-card-check {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 22px;
+    height: 22px;
+    background: var(--accent);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    z-index: 1;
+  }
+
+  .roundup-post-card-check svg {
+    width: 11px;
+    height: 11px;
+  }
+
+  .roundup-post-card-thumb {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    background: var(--border);
+  }
+
+  .roundup-post-card-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .roundup-post-card-no-thumb {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+  }
+
+  .roundup-post-card-info {
+    padding: 10px;
+  }
+
+  .roundup-post-card-venue {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.3;
+  }
+
+  .roundup-post-card-date {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 3px;
+  }
+
+  .roundup-post-card-no-yt {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-top: 3px;
+    font-style: italic;
+  }
+
+  /* Area Roundup badge in History */
+  .roundup-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    color: var(--accent);
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    border-radius: 4px;
+    padding: 1px 6px;
+    line-height: 1.6;
+    flex-shrink: 0;
   }
 `;

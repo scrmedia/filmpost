@@ -11,6 +11,7 @@ import { SettingsPage } from "./components/SettingsPage";
 import { ProfilePage } from "./components/ProfilePage";
 import { VenuePage } from "./components/VenuePage";
 import { YouTubeCallback } from "./components/YouTubeCallback";
+import { RoundupPage } from "./components/RoundupPage";
 
 const isYTCallback = window.location.pathname === "/youtube/callback";
 
@@ -143,6 +144,7 @@ export default function App() {
           {page === "venues" && <VenuePage user={user} posts={posts} venues={venues} onVenuesChange={() => loadVenues(user.id)} setPage={setPage} />}
           {page === "settings" && <SettingsPage user={user} onSaveUser={saveUser} />}
           {page === "profile" && <ProfilePage user={user} onUpdate={saveUser} />}
+          {page === "roundup" && <RoundupPage user={user} posts={posts} onDone={() => { loadPosts(user.id); setPage("history"); }} />}
         </main>
       </div>
 

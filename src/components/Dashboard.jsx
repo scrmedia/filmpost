@@ -166,6 +166,13 @@ export function Dashboard({ user, posts, setPage }) {
                   </>
                 )}
               </div>
+              <div className="quick-action-card" onClick={() => setPage("roundup")}>
+                <div className="quick-action-icon">
+                  <Icon.MapPin />
+                </div>
+                <h4 className="quick-action-title">Area Roundup Post</h4>
+                <p className="quick-action-desc">Generate a long-form blog post targeting a regional search term — featuring multiple past weddings.</p>
+              </div>
             </div>
           </div>
           

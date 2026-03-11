@@ -283,6 +283,7 @@ export function HistoryPage({ posts, user }) {
                         <div className="upload-info">
                           <div className="upload-title">{post.yt_title || "Untitled"}</div>
                           <div className="upload-meta">
+                            {post.post_type === "roundup" && <span className="roundup-badge">Area Roundup</span>}
                             <span>{post.venue}</span>
                             <span>{new Date(post.created_at).toLocaleDateString()}</span>
                             {versionCount > 1 && (
