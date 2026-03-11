@@ -4,7 +4,9 @@ import { supabase, VENUE_QUESTIONS, buildBusinessFooter, callClaude } from "../u
 
 const CHUNK_SIZE = 4 * 1024 * 1024; // 4 MB
 
-export function UploadPage({ user, onSuccess }) {
+const PROCESSING_DELAY = 120; // seconds to wait after YouTube upload completes
+
+export function UploadPage({ user, onSuccess, onDone }) {
   const [step, setStep] = useState(1);
   const [file, setFile] = useState(null);
   const [venueName, setVenueName] = useState("");
@@ -25,6 +27,9 @@ export function UploadPage({ user, onSuccess }) {
   const [ytUploadUri, setYtUploadUri] = useState(null);
   const [ytUpload, setYtUpload] = useState({ state: "idle", progress: 0, videoId: null, error: null });
   const [savedPostId, setSavedPostId] = useState(null);
+
+  // Done button countdown (starts after YouTube upload completes)
+  const [countdown, setCountdown] = useState(null); // null = not started, >0 = counting, 0 = ready
 
   const ytUploadStarted = useRef(false);
   const wpPostIdRef = useRef(null);       // WP post ID — needed by the upload useEffect
@@ -372,6 +377,18 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
     return () => { aborted = true; };
   }, [step, ytUploadUri, file, savedPostId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Post-upload countdown (2 min processing buffer after YouTube finishes) ──
+  useEffect(() => {
+    if (ytUpload.state !== "done") return;
+    setCountdown(PROCESSING_DELAY);
+  }, [ytUpload.state]);
+
+  useEffect(() => {
+    if (countdown === null || countdown === 0) return;
+    const t = setTimeout(() => setCountdown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [countdown]);
+
   // ── Loading screen ─────────────────────────────────────────────────────────
   if (loading) {
     return (
@@ -545,6 +562,9 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
               <div className="success-screen">
                 <div className="success-icon-large"><Icon.Check /></div>
                 <h2 className="success-title">Content Published</h2>
+                <p style={{ color: "var(--text-muted)", fontSize: 14, maxWidth: 520, margin: "8px auto 0", lineHeight: 1.6, textAlign: "center" }}>
+                  Your film is currently being processed by YouTube. Once it has finished uploading, it will be automatically embedded in your blog post — this usually takes a few minutes. Open the WordPress draft link above, and once the YouTube video is live, double check the film has been added to your post before publishing.
+                </p>
 
                 <div className="success-links">
                   {/* WordPress result */}
@@ -614,9 +634,40 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
                   ) : null}
                 </div>
 
-                <button className="btn btn-primary" style={{ marginTop: 32 }} onClick={() => { setStep(1); setFile(null); setVenueName(""); setVenueAnswers({}); setYoutubeTitle(""); setYoutubeDesc(""); setBlogContent(""); setWpResult(null); setYtUploadUri(null); setYtUpload({ state: "idle", progress: 0, videoId: null, error: null }); ytUploadStarted.current = false; wpPostIdRef.current = null; blogContentRef.current = ""; if (heroImagePreview) URL.revokeObjectURL(heroImagePreview); setHeroImage(null); setHeroImagePreview(null); heroImageRef.current = null; setSavedPostId(null); }}>
-                  + New Film
-                </button>
+                {(() => {
+                  // Determine Done button state
+                  const ytConnected = !!user.youtube_refresh_token;
+                  const ytStillUploading = ytConnected && ytUpload.state !== "done" && ytUpload.state !== "idle" && !ytUpload.error && ytUploadUri;
+                  const countingDown = countdown !== null && countdown > 0;
+                  const doneDisabled = ytStillUploading || countingDown;
+
+                  let statusMsg = null;
+                  if (ytStillUploading) {
+                    statusMsg = "Waiting for YouTube upload to complete…";
+                  } else if (countingDown) {
+                    const mins = Math.floor(countdown / 60);
+                    const secs = String(countdown % 60).padStart(2, "0");
+                    statusMsg = `Almost ready — giving YouTube a moment to process… (${mins}:${secs} remaining)`;
+                  } else if (countdown === 0) {
+                    statusMsg = "Your upload is ready. You can now close this screen.";
+                  }
+
+                  return (
+                    <div style={{ marginTop: 32, textAlign: "center" }}>
+                      <button
+                        className="btn btn-primary"
+                        disabled={doneDisabled}
+                        style={doneDisabled ? { opacity: 0.4, cursor: "not-allowed" } : {}}
+                        onClick={() => onDone?.()}
+                      >
+                        Done
+                      </button>
+                      {statusMsg && (
+                        <p style={{ marginTop: 10, fontSize: 13, color: "var(--text-muted)" }}>{statusMsg}</p>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           </div>
