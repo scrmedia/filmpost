@@ -14,6 +14,7 @@ const PLATFORMS = [
   { value: "wordpress",   label: "WordPress",   icon: "WordPress" },
   { value: "squarespace", label: "Squarespace", icon: "Squarespace" },
   { value: "wix",         label: "Wix",         icon: "Wix" },
+  { value: "pixieset",    label: "Pixieset",    icon: "Pixieset" },
 ];
 
 export function ProfilePage({ user, onUpdate }) {

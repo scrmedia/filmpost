@@ -3,6 +3,7 @@ import { Icon } from "../icons";
 import { supabase, VENUE_QUESTIONS, buildBusinessFooter, callClaude } from "../utils";
 import { SquarespaceExport } from "./SquarespaceExport";
 import { WixExport } from "./WixExport";
+import { PixiesetExport } from "./PixiesetExport";
 
 const CHUNK_SIZE = 4 * 1024 * 1024; // 4 MB
 
@@ -33,6 +34,7 @@ export function UploadPage({ user, onSuccess, onDone }) {
   // CMS export panels (Squarespace / Wix)
   const [ssOpen, setSsOpen] = useState(false);
   const [wixOpen, setWixOpen] = useState(false);
+  const [pixiesetOpen, setPixiesetOpen] = useState(false);
   const [cmsPublished, setCmsPublished] = useState(""); // CMS name shown in success message
 
   // Done button countdown (starts after YouTube upload completes)
@@ -568,6 +570,10 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
                   <button className="btn btn-primary btn-lg" onClick={() => setWixOpen(true)}>
                     Export for Wix <Icon.Arrow />
                   </button>
+                ) : user?.platform === "pixieset" ? (
+                  <button className="btn btn-primary btn-lg" onClick={() => setPixiesetOpen(true)}>
+                    Export for Pixieset <Icon.Arrow />
+                  </button>
                 ) : (
                   <button className="btn btn-primary btn-lg" onClick={publishContent}>
                     Publish Now <Icon.Arrow />
@@ -724,6 +730,18 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
           savedPostId={savedPostId}
           onClose={() => setWixOpen(false)}
           onPublished={() => { setWixOpen(false); setCmsPublished("Wix"); onSuccess?.(); }}
+        />
+      )}
+      {pixiesetOpen && (
+        <PixiesetExport
+          venueName={venueName}
+          youtubeTitle={youtubeTitle}
+          blogContent={blogContent}
+          youtubeDesc={youtubeDesc}
+          heroImagePreview={heroImagePreview}
+          savedPostId={savedPostId}
+          onClose={() => setPixiesetOpen(false)}
+          onPublished={() => { setPixiesetOpen(false); setCmsPublished("Pixieset"); onSuccess?.(); }}
         />
       )}
     </>

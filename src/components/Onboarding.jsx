@@ -8,6 +8,7 @@ const CMS_OPTIONS = [
   { value: "wordpress",   label: "WordPress",   icon: "WordPress" },
   { value: "squarespace", label: "Squarespace", icon: "Squarespace" },
   { value: "wix",         label: "Wix",         icon: "Wix" },
+  { value: "pixieset",    label: "Pixieset",    icon: "Pixieset" },
 ];
 
 // Extract the 11-character YouTube video ID from any common YouTube URL format.
