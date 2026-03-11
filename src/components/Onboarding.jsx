@@ -136,7 +136,7 @@ export function Onboarding({ onComplete }) {
         if (!form.business_name) throw new Error("Business name required");
         const hash = await bcrypt.hash(form.password, 10);
         const { data, error: err } = await supabase.from("users").insert([{
-          name: form.name, email: form.email, password_hash: hash,
+          email: form.email, password_hash: hash,
           business_name: form.business_name, tagline: form.tagline,
           enquiry_email: form.enquiry_email || form.email,
           website: form.website, instagram: form.instagram,
