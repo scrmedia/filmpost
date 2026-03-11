@@ -10,6 +10,66 @@ const CHUNK_SIZE = 4 * 1024 * 1024; // 4 MB
 
 const PROCESSING_DELAY = 120; // seconds to wait after YouTube upload completes
 
+const CREDIT_FIELDS = [
+  { key: "photographer", label: "Photographer" },
+  { key: "planner",      label: "Planner" },
+  { key: "band",         label: "Band" },
+  { key: "florist",      label: "Florist" },
+  { key: "cake",         label: "Cake" },
+  { key: "hairMakeup",   label: "Hair and Make Up" },
+  { key: "stationery",   label: "Stationery" },
+  { key: "dress",        label: "Dress" },
+];
+
+// Assemble Template 2 HTML from Claude's standard output
+function assembleTemplate2Html(claudeOutput, credits, coupleNames, businessName) {
+  // Split JSON-LD from blog HTML
+  const scriptEnd = claudeOutput.indexOf("</script>");
+  let jsonLd = "";
+  let bodyHtml = claudeOutput;
+  if (scriptEnd !== -1) {
+    jsonLd = claudeOutput.slice(0, scriptEnd + "</script>".length);
+    bodyHtml = claudeOutput.slice(scriptEnd + "</script>".length).trim();
+  }
+
+  // Split FAQ (and any trailing SEO block) from main body
+  const faqIdx = bodyHtml.search(/<h2[^>]*>\s*Frequently Asked Questions/i);
+  const mainContent = faqIdx !== -1 ? bodyHtml.slice(0, faqIdx).trim() : bodyHtml;
+  const faqContent  = faqIdx !== -1 ? bodyHtml.slice(faqIdx).trim() : "";
+
+  // Couple quote blockquote (omitted if no quote provided)
+  const quoteHtml = credits.coupleQuote ? `<blockquote style="text-align:center;font-style:italic;margin:0 auto 32px;padding:0 8%;border:none;max-width:640px;">
+  <p style="font-size:1.1em;line-height:1.75;margin:0 0 10px;">\u201c${credits.coupleQuote}\u201d</p>${coupleNames ? `
+  <footer style="font-size:0.8em;font-variant:small-caps;letter-spacing:0.1em;color:#888;">\u2014 ${coupleNames}</footer>` : ""}
+</blockquote>` : "";
+
+  // Supplier credits sidebar
+  const creditRows = [
+    `<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #e8e8e8;font-size:13px;"><span style="font-weight:600;min-width:100px;flex-shrink:0;color:#555;">Videographer</span><span>${businessName}</span></div>`,
+    ...CREDIT_FIELDS
+      .filter(f => (credits[f.key] || "").trim())
+      .map(f => `<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #e8e8e8;font-size:13px;"><span style="font-weight:600;min-width:100px;flex-shrink:0;color:#555;">${f.label}</span><span>${credits[f.key]}</span></div>`),
+  ].join("\n");
+
+  const supplierHtml = `<aside style="background:#f9f9f9;border-radius:8px;padding:20px;border:1px solid #eee;position:sticky;top:24px;">
+  <h3 style="margin:0 0 12px;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:#999;font-weight:600;">Credits</h3>
+  ${creditRows}
+</aside>`;
+
+  return `${jsonLd}
+<!-- YOUTUBE_EMBED_PLACEHOLDER -->
+${quoteHtml}
+<div style="display:grid;grid-template-columns:2fr 1fr;gap:32px;align-items:start;margin-bottom:48px;">
+  <div>
+    ${mainContent}
+  </div>
+  <div>
+    ${supplierHtml}
+  </div>
+</div>
+${faqContent}`.trim();
+}
+
 export function UploadPage({ user, venues = [], onSuccess, onDone, onVenueAdded }) {
   const [step, setStep] = useState(1);
   const [file, setFile] = useState(null);
@@ -31,6 +91,13 @@ export function UploadPage({ user, venues = [], onSuccess, onDone, onVenueAdded 
   const [ytUploadUri, setYtUploadUri] = useState(null);
   const [ytUpload, setYtUpload] = useState({ state: "idle", progress: 0, videoId: null, error: null });
   const [savedPostId, setSavedPostId] = useState(null);
+
+  // Supplier credits (Template 2 only)
+  const [supplierCredits, setSupplierCredits] = useState({
+    coupleQuote: "", photographer: "", planner: "", band: "",
+    florist: "", cake: "", hairMakeup: "", stationery: "", dress: "",
+  });
+  const [suppliersExpanded, setSuppliersExpanded] = useState(false);
 
   // Venue library
   const [venueQuery, setVenueQuery] = useState("");
@@ -196,7 +263,10 @@ OUTBOUND LINK: ${venueAnswers.venueWebsite ? `Include one natural outbound link 
 HTML tags allowed: <script> (JSON-LD only), <h1>, <h2>, <h3>, <p>, <strong>, <a> (for the venue outbound link only). No <html>, <body>, or <head> tags.
 ${seoSection}
 Return ONLY the JSON-LD block followed by the blog post HTML.`);
-      setBlogContent(blog.trim());
+      const finalBlog = user.blog_template === "film_suppliers"
+        ? assembleTemplate2Html(blog.trim(), supplierCredits, venueAnswers.coupleNames, user.business_name || "")
+        : blog.trim();
+      setBlogContent(finalBlog);
 
       // Save history entry immediately — before any publish attempt
       try {
@@ -205,7 +275,7 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
           venue: venueName,
           yt_title: title.trim(),
           yt_description: desc.trim(),
-          blog_content: blog.trim(),
+          blog_content: finalBlog,
           status: "draft",
         };
         const { data: post, error: insertError } = await supabase
@@ -390,10 +460,19 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
               if (wpPostIdRef.current && user.wp_url && user.wp_user && user.wp_pass) {
                 const embed = `<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;">\n  <iframe src="https://www.youtube.com/embed/${data.videoId}" style="position:absolute;top:0;left:0;width:100%;height:100%;" frameborder="0" allowfullscreen></iframe>\n</div>`;
                 const content = blogContentRef.current;
-                const insertAt = content.indexOf("</p>");
-                const updatedContent = insertAt !== -1
-                  ? content.slice(0, insertAt + 4) + "\n\n" + embed + "\n\n" + content.slice(insertAt + 4)
-                  : embed + "\n\n" + content;
+                let updatedContent;
+                if (user.blog_template === "film_suppliers") {
+                  // Template 2: replace the placeholder comment with the embed
+                  updatedContent = content.includes("<!-- YOUTUBE_EMBED_PLACEHOLDER -->")
+                    ? content.replace("<!-- YOUTUBE_EMBED_PLACEHOLDER -->", embed)
+                    : embed + "\n\n" + content;
+                } else {
+                  // Template 1: insert embed after the first closing </p>
+                  const insertAt = content.indexOf("</p>");
+                  updatedContent = insertAt !== -1
+                    ? content.slice(0, insertAt + 4) + "\n\n" + embed + "\n\n" + content.slice(insertAt + 4)
+                    : embed + "\n\n" + content;
+                }
                 await fetch(`${user.wp_url}/wp-json/wp/v2/posts/${wpPostIdRef.current}`, {
                   method: "POST",
                   headers: { "Content-Type": "application/json", Authorization: `Basic ${btoa(`${user.wp_user}:${user.wp_pass}`)}` },
@@ -569,6 +648,52 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
                   )}
                 </div>
               ))}
+              {/* Supplier Credits — Template 2 only */}
+              {user.blog_template === "film_suppliers" && (
+                <div className="supplier-section" style={{ marginTop: 24 }}>
+                  <button
+                    type="button"
+                    className="supplier-section-toggle"
+                    onClick={() => setSuppliersExpanded(e => !e)}
+                  >
+                    <span>Supplier Credits <span className="label-hint">(optional)</span></span>
+                    <span style={{ fontSize: 11 }}>{suppliersExpanded ? "▲" : "▼"}</span>
+                  </button>
+                  {suppliersExpanded && (
+                    <div className="supplier-section-body">
+                      <div className="field">
+                        <label className="label">Couple Quote <span className="label-hint">(optional)</span></label>
+                        <textarea
+                          className="textarea"
+                          value={supplierCredits.coupleQuote}
+                          onChange={e => setSupplierCredits(c => ({ ...c, coupleQuote: e.target.value }))}
+                          placeholder="A quote from the couple about their wedding day…"
+                          style={{ minHeight: 72 }}
+                        />
+                      </div>
+                      <div className="field">
+                        <label className="label">Videographer</label>
+                        <input className="input" value={user.business_name || ""} disabled style={{ opacity: 0.55 }} />
+                        <p className="form-hint">Auto-filled from your business profile.</p>
+                      </div>
+                      <div className="supplier-grid">
+                        {CREDIT_FIELDS.map(f => (
+                          <div className="field" key={f.key}>
+                            <label className="label">{f.label}</label>
+                            <input
+                              className="input"
+                              value={supplierCredits[f.key]}
+                              onChange={e => setSupplierCredits(c => ({ ...c, [f.key]: e.target.value }))}
+                              placeholder="Name or company"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="field" style={{ marginTop: 24 }}>
                 <label className="label">
                   Hero Image <span className="label-hint">(used as YouTube thumbnail and blog featured image)</span>
