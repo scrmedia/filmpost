@@ -33,9 +33,9 @@ export function Dashboard({ user, posts, setPage }) {
         ? `${Math.floor(diffMins / 60)}h ago`
         : `${Math.floor(diffMins / 1440)}d ago`;
     const events = [];
-    if (p.youtube_url) events.push({ icon: "success", text: `Video uploaded — ${p.venue_name || "Untitled"}`, time: timeAgo });
-    if (p.wp_edit_url) events.push({ icon: "success", text: `Blog draft created — ${p.venue_name || "Untitled"}`, time: timeAgo });
-    if (!p.youtube_url && !p.wp_edit_url) events.push({ icon: "default", text: `Content generated — ${p.venue_name || "Untitled"}`, time: timeAgo });
+    if (p.yt_url) events.push({ icon: "success", text: `Video uploaded — ${p.venue || "Untitled"}`, time: timeAgo });
+    if (p.wp_edit_url) events.push({ icon: "success", text: `Blog draft created — ${p.venue || "Untitled"}`, time: timeAgo });
+    if (!p.yt_url && !p.wp_edit_url) events.push({ icon: "default", text: `Content generated — ${p.venue || "Untitled"}`, time: timeAgo });
     return events;
   }).slice(0, 5);
 
@@ -120,9 +120,9 @@ export function Dashboard({ user, posts, setPage }) {
                           <Icon.Video />
                         </div>
                         <div className="upload-info">
-                          <div className="upload-title">{post.youtube_title || "Untitled"}</div>
+                          <div className="upload-title">{post.yt_title || "Untitled"}</div>
                           <div className="upload-meta">
-                            <span>{post.venue_name}</span>
+                            <span>{post.venue}</span>
                             <span>{new Date(post.created_at).toLocaleDateString()}</span>
                           </div>
                         </div>

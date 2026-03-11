@@ -46,17 +46,17 @@ export function Onboarding({ onComplete }) {
     try {
       const { data } = await supabase
         .from("posts")
-        .select("youtube_url, youtube_title, users!inner(business_name, website)")
+        .select("yt_url, yt_title, users!inner(business_name, website)")
         .eq("status", "published")
-        .not("youtube_url", "is", null)
+        .not("yt_url", "is", null)
         .eq("users.featured_opt_in", true);
 
       if (!data || data.length === 0) return;
 
       const films = data
         .map(p => ({
-          youtube_url: p.youtube_url,
-          youtube_title: p.youtube_title,
+          youtube_url: p.yt_url,
+          youtube_title: p.yt_title,
           business_name: p.users?.business_name,
           website: p.users?.website,
         }))

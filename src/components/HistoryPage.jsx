@@ -245,9 +245,9 @@ export function HistoryPage({ posts, user }) {
                       >
                         <div className="upload-thumbnail"><Icon.Video /></div>
                         <div className="upload-info">
-                          <div className="upload-title">{post.youtube_title || "Untitled"}</div>
+                          <div className="upload-title">{post.yt_title || "Untitled"}</div>
                           <div className="upload-meta">
-                            <span>{post.venue_name}</span>
+                            <span>{post.venue}</span>
                             <span>{new Date(post.created_at).toLocaleDateString()}</span>
                             {versionCount > 1 && (
                               <span style={{ color: "var(--accent)" }}>v{versionCount}</span>

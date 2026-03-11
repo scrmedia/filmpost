@@ -174,9 +174,9 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
       try {
         const insertPayload = {
           user_id: user.id,
-          venue_name: venueName,
-          youtube_title: title.trim(),
-          youtube_description: desc.trim(),
+          venue: venueName,
+          yt_title: title.trim(),
+          yt_description: desc.trim(),
           blog_content: blog.trim(),
           status: "draft",
         };
@@ -286,6 +286,7 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
       try {
         await supabase.from("posts").update({
           wp_edit_url: wp?.editUrl || null,
+          wp_post_id: wpPostIdRef.current || null,
           status: uploadUri ? "uploading" : "published",
         }).eq("id", savedPostId);
       } catch (e) {
@@ -334,7 +335,7 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
               // Update Supabase post record
               if (savedPostId) {
                 await supabase.from("posts").update({
-                  youtube_url: youtubeUrl,
+                  yt_url: youtubeUrl,
                   status: "published",
                 }).eq("id", savedPostId);
               }
