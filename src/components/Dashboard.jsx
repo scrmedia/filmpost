@@ -60,21 +60,15 @@ export function Dashboard({ user, posts, setPage }) {
               <div className="stat-icon">
                 <Icon.YouTube />
               </div>
-              <div className="stat-trend up">
-                <Icon.TrendUp /> 12%
-              </div>
             </div>
             <div className="stat-value">{totalVideos}</div>
             <div className="stat-label">Videos Published</div>
           </div>
-          
+
           <div className="stat-card">
             <div className="stat-header">
               <div className="stat-icon">
                 <Icon.Blog />
-              </div>
-              <div className="stat-trend up">
-                <Icon.TrendUp /> 8%
               </div>
             </div>
             <div className="stat-value">{totalBlogs}</div>
@@ -114,8 +108,8 @@ export function Dashboard({ user, posts, setPage }) {
               <div className="card-body no-padding">
                 {recentPosts.length > 0 ? (
                   <div className="uploads-list">
-                    {recentPosts.map((post, i) => (
-                      <div key={i} className="upload-item">
+                    {recentPosts.map((post) => (
+                      <div key={post.id} className="upload-item">
                         <div className="upload-thumbnail">
                           <Icon.Video />
                         </div>
@@ -126,9 +120,9 @@ export function Dashboard({ user, posts, setPage }) {
                             <span>{new Date(post.created_at).toLocaleDateString()}</span>
                           </div>
                         </div>
-                        <div className="upload-status published">
+                        <div className={`upload-status ${post.status === "published" ? "published" : post.status === "uploading" ? "processing" : "draft"}`}>
                           <span className="status-dot"></span>
-                          Published
+                          {post.status === "published" ? "Published" : post.status === "uploading" ? "Uploading" : "Draft"}
                         </div>
                       </div>
                     ))}

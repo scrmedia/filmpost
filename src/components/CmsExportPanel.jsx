@@ -145,7 +145,7 @@ export function CmsExportPanel({
     },
     {
       num: 4,
-      title: "Featured Image",
+      title: cmsConfig.step4ImageLabel,
       body: heroImagePreview ? (
         <div className="ss-image-row">
           <img src={heroImagePreview} alt="Featured" className="ss-thumbnail" />
