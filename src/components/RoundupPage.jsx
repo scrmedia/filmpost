@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { Icon } from "../icons";
-import { supabase, buildBusinessFooter, callClaude } from "../utils";
+import { supabase, callClaude } from "../utils";
 import { SquarespaceExport } from "./SquarespaceExport";
 import { WixExport } from "./WixExport";
 import { PixiesetExport } from "./PixiesetExport";
