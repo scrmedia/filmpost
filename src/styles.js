@@ -2996,4 +2996,147 @@ export const styles = `
     line-height: 1.6;
     flex-shrink: 0;
   }
+
+  /* "Already on YouTube" mode toggle on Step 1 */
+  .yt-mode-toggle {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+
+  .yt-mode-toggle:hover { border-color: var(--accent); }
+
+  .yt-mode-toggle input[type="checkbox"] {
+    margin-top: 2px;
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+
+  .yt-mode-toggle-text {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .yt-mode-toggle-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .yt-mode-toggle-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  /* Regenerate YouTube metadata section on Step 2 */
+  .regen-yt-section {
+    margin-top: 24px;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+
+  .regen-yt-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    cursor: pointer;
+  }
+
+  .regen-yt-label input[type="checkbox"] {
+    margin-top: 2px;
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+
+  .regen-yt-text {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .regen-yt-heading {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .regen-yt-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+
+  /* YouTube metadata panel on Step 3 (existing video mode) */
+  .yt-meta-panel {
+    margin-top: 24px;
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .yt-meta-panel-header {
+    padding: 14px 16px 12px;
+    background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+    border-bottom: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  }
+
+  .yt-meta-panel-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    margin: 0 0 4px;
+  }
+
+  .yt-meta-panel-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  .yt-meta-field {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .yt-meta-field:last-child { border-bottom: none; }
+
+  .yt-meta-field-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+
+  .yt-meta-copy-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .yt-meta-copy-row .ss-text-box {
+    flex: 1;
+    min-width: 0;
+    font-size: 13px;
+  }
+
+  .yt-meta-copy-row .ss-copy-btn {
+    flex-shrink: 0;
+  }
 `;

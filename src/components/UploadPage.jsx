@@ -122,9 +122,37 @@ export function UploadPage({ user, venues = [], onSuccess, onDone, onVenueAdded 
   const dropRef = useRef(null);
   const [dragOver, setDragOver] = useState(false);
 
+  // "Already on YouTube" mode
+  const [useExistingYt, setUseExistingYt] = useState(false);
+  const [existingYtUrl, setExistingYtUrl] = useState("");
+  const [existingYtUrlError, setExistingYtUrlError] = useState("");
+  const [regenYtMeta, setRegenYtMeta] = useState(false);
+  // Freshly generated YT metadata (shown in Step 3 for existing-video mode)
+  const [freshYtTitle, setFreshYtTitle] = useState("");
+  const [freshYtDesc, setFreshYtDesc] = useState("");
+  const [freshYtTags, setFreshYtTags] = useState("");
+  const [copiedYtField, setCopiedYtField] = useState(null);
+
   // Keep refs in sync so the upload useEffect always reads the latest values
   useEffect(() => { blogContentRef.current = blogContent; }, [blogContent]);
   useEffect(() => { heroImageRef.current = heroImage; }, [heroImage]);
+
+  // ── YouTube URL helpers ─────────────────────────────────────────────────────
+  const isValidYtUrl = (url) =>
+    /(?:youtube\.com\/watch\?(?:.*&)?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/.test((url || "").trim());
+
+  const extractYtVideoId = (url) => {
+    const m = (url || "").match(/(?:youtube\.com\/watch\?(?:.*&)?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+    return m ? m[1] : null;
+  };
+
+  const copyYtField = async (field, text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedYtField(field);
+      setTimeout(() => setCopiedYtField(null), 2000);
+    } catch (_) {}
+  };
 
   // ── File handling ──────────────────────────────────────────────────────────
   const handleDrop = useCallback((e) => {
@@ -277,6 +305,8 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
           yt_description: desc.trim(),
           blog_content: finalBlog,
           status: "draft",
+          video_source: useExistingYt ? "existing" : "uploaded",
+          ...(useExistingYt ? { yt_url: existingYtUrl } : {}),
         };
         const { data: post, error: insertError } = await supabase
           .from("posts")
@@ -291,6 +321,20 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
       // Show save-to-library banner if this venue isn't already in the library
       const alreadySaved = venues.some(v => v.venue_name.toLowerCase() === venueName.toLowerCase());
       if (!alreadySaved) setShowSaveBanner(true);
+
+      // Generate fresh YouTube metadata if user opted in (existing video mode)
+      if (useExistingYt && regenYtMeta) {
+        try {
+          const fTitle = await callClaude(systemPrompt, `Write a fresh SEO-optimised YouTube title for a wedding film at "${venueName}".\n\n${fullAnswersText}\n\nInclude the venue name. If the questionnaire includes a couple's names, you may include them. Keep it under 70 characters. Sound natural, not like a magazine headline. Return ONLY the title, no quotes.`);
+          const fDesc  = await callClaude(systemPrompt, `Write a YouTube description for this wedding film:\nVenue: ${venueName}\n${fullAnswersText}\n\nStart with a short, natural opening sentence or two about the day — written like a videographer talking about a wedding they genuinely loved filming. Then cover the filming highlights in plain, specific language. No em dashes. No fancy adjectives.\n\nEnd with this exact footer:\n\n${buildBusinessFooter(user)}\n\nUnder 4000 characters. Return ONLY the description text.`);
+          const fTags  = await callClaude(systemPrompt, `Generate 12 relevant YouTube tags for a wedding film at "${venueName}". ${answersText ? `Wedding details: ${answersText.slice(0, 300)}` : ""} Return ONLY a comma-separated list of tags, no other text or explanation.`);
+          setFreshYtTitle(fTitle.trim());
+          setFreshYtDesc(fDesc.trim());
+          setFreshYtTags(fTags.trim());
+        } catch (e) {
+          console.error("[FilmPost] Failed to generate fresh YouTube metadata:", e.message);
+        }
+      }
 
       setStep(3);
     } catch (e) {
@@ -353,6 +397,31 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
         }
       } catch (e) {
         wp = { success: false, error: e.message };
+      }
+    }
+
+    // 1b. For existing YouTube videos: inject embed into WP draft immediately
+    if (useExistingYt) {
+      const existingVideoId = extractYtVideoId(existingYtUrl);
+      if (existingVideoId && wp?.success && wpPostIdRef.current && user.wp_url && user.wp_user && user.wp_pass) {
+        const embed = `<div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;">\n  <iframe src="https://www.youtube.com/embed/${existingVideoId}" style="position:absolute;top:0;left:0;width:100%;height:100%;" frameborder="0" allowfullscreen></iframe>\n</div>`;
+        const content = blogContent;
+        let updatedContent;
+        if (user.blog_template === "film_suppliers") {
+          updatedContent = content.includes("<!-- YOUTUBE_EMBED_PLACEHOLDER -->")
+            ? content.replace("<!-- YOUTUBE_EMBED_PLACEHOLDER -->", embed)
+            : embed + "\n\n" + content;
+        } else {
+          const insertAt = content.indexOf("</p>");
+          updatedContent = insertAt !== -1
+            ? content.slice(0, insertAt + 4) + "\n\n" + embed + "\n\n" + content.slice(insertAt + 4)
+            : embed + "\n\n" + content;
+        }
+        await fetch(`${user.wp_url}/wp-json/wp/v2/posts/${wpPostIdRef.current}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Basic ${btoa(`${user.wp_user}:${user.wp_pass}`)}` },
+          body: JSON.stringify({ content: updatedContent }),
+        }).catch(() => {});
       }
     }
 
@@ -544,7 +613,7 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
 
       <div className="main-body">
         <div className="stepper">
-          {[["Upload Video", 1], ["Venue Details", 2], ["Review & Edit", 3], ["Published", 4]].map(([label, n], i, arr) => (
+          {[[useExistingYt ? "Add Video" : "Upload Video", 1], ["Venue Details", 2], ["Review & Edit", 3], ["Published", 4]].map(([label, n], i, arr) => (
             <div key={n} style={{ display: "flex", alignItems: "center", flex: i < arr.length - 1 ? 1 : "none" }}>
               <div className={`step ${step >= n ? (step > n ? "completed" : "active") : ""}`}>
                 <div className="step-number">{step > n ? <Icon.Check /> : n}</div>
@@ -557,26 +626,72 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
 
         {error && <div className="alert alert-error">{error}</div>}
 
-        {/* Step 1 — Upload Video */}
+        {/* Step 1 — Upload Video / Add YouTube URL */}
         {step === 1 && (
           <div className="card">
-            <div className="card-header"><h3 className="card-title">Select Your Video</h3></div>
+            <div className="card-header">
+              <h3 className="card-title">{useExistingYt ? "Add Your YouTube URL" : "Select Your Video"}</h3>
+            </div>
             <div className="card-body">
-              <div
-                ref={dropRef}
-                className={`upload-zone ${dragOver ? "drag-over" : ""} ${file ? "has-file" : ""}`}
-                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-                onDragLeave={() => setDragOver(false)}
-                onDrop={handleDrop}
-                onClick={() => document.getElementById("fileInput").click()}
-              >
-                <input id="fileInput" type="file" accept="video/*" hidden onChange={handleFileSelect} />
-                <div className="upload-zone-icon">{file ? <Icon.Check /> : <Icon.Upload />}</div>
-                <h3 className="upload-zone-title">{file ? file.name : "Drop your video here"}</h3>
-                <p className="upload-zone-desc">{file ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : "or click to browse"}</p>
-              </div>
+              {/* Mode toggle */}
+              <label className="yt-mode-toggle">
+                <input
+                  type="checkbox"
+                  checked={useExistingYt}
+                  onChange={e => {
+                    setUseExistingYt(e.target.checked);
+                    setExistingYtUrl("");
+                    setExistingYtUrlError("");
+                    setFile(null);
+                  }}
+                />
+                <div className="yt-mode-toggle-text">
+                  <span className="yt-mode-toggle-label">I already have this video on YouTube</span>
+                  <span className="yt-mode-toggle-desc">Skip the upload and paste an existing YouTube URL instead.</span>
+                </div>
+              </label>
+
+              {useExistingYt ? (
+                <div className="field" style={{ marginTop: 24 }}>
+                  <label className="label">YouTube URL</label>
+                  <input
+                    className="input"
+                    value={existingYtUrl}
+                    onChange={e => { setExistingYtUrl(e.target.value); setExistingYtUrlError(""); }}
+                    onBlur={() => {
+                      if (existingYtUrl && !isValidYtUrl(existingYtUrl)) {
+                        setExistingYtUrlError("Please enter a valid YouTube URL (e.g. https://www.youtube.com/watch?v=ABC123)");
+                      }
+                    }}
+                    placeholder="https://www.youtube.com/watch?v=..."
+                  />
+                  {existingYtUrlError && (
+                    <p className="form-hint" style={{ color: "var(--error)", marginTop: 4 }}>{existingYtUrlError}</p>
+                  )}
+                </div>
+              ) : (
+                <div
+                  ref={dropRef}
+                  className={`upload-zone ${dragOver ? "drag-over" : ""} ${file ? "has-file" : ""}`}
+                  style={{ marginTop: 24 }}
+                  onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={handleDrop}
+                  onClick={() => document.getElementById("fileInput").click()}
+                >
+                  <input id="fileInput" type="file" accept="video/*" hidden onChange={handleFileSelect} />
+                  <div className="upload-zone-icon">{file ? <Icon.Check /> : <Icon.Upload />}</div>
+                  <h3 className="upload-zone-title">{file ? file.name : "Drop your video here"}</h3>
+                  <p className="upload-zone-desc">{file ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : "or click to browse"}</p>
+                </div>
+              )}
+
               <div style={{ marginTop: 32 }}>
-                <button className="btn btn-primary btn-lg" disabled={!file} onClick={() => setStep(2)}>
+                <button
+                  className="btn btn-primary btn-lg"
+                  disabled={useExistingYt ? !isValidYtUrl(existingYtUrl) : !file}
+                  onClick={() => setStep(2)}
+                >
                   Continue <Icon.Arrow />
                 </button>
               </div>
@@ -737,6 +852,26 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
                 )}
               </div>
 
+              {/* Regenerate YouTube metadata — existing video mode only */}
+              {useExistingYt && (
+                <div className="regen-yt-section">
+                  <label className="regen-yt-label">
+                    <input
+                      type="checkbox"
+                      checked={regenYtMeta}
+                      onChange={e => setRegenYtMeta(e.target.checked)}
+                    />
+                    <div className="regen-yt-text">
+                      <span className="regen-yt-heading">Regenerate YouTube metadata</span>
+                      <span className="regen-yt-desc">
+                        Generate an improved SEO title, description, and tags for your existing video.
+                        You'll be able to copy these into YouTube Studio after content is generated.
+                      </span>
+                    </div>
+                  </label>
+                </div>
+              )}
+
               <div style={{ display: "flex", gap: 12, marginTop: 32 }}>
                 <button className="btn btn-secondary" onClick={() => setStep(1)}>Back</button>
                 <button className="btn btn-primary btn-lg" disabled={!venueName} onClick={generateContent}>
@@ -780,6 +915,54 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
                 <label className="label">Blog Post</label>
                 <textarea className="textarea" value={blogContent} onChange={e => setBlogContent(e.target.value)} style={{ minHeight: 300 }} />
               </div>
+
+              {/* YouTube metadata panel — existing video mode with regen opted in */}
+              {useExistingYt && freshYtTitle && (
+                <div className="yt-meta-panel">
+                  <div className="yt-meta-panel-header">
+                    <h4 className="yt-meta-panel-title">YouTube Metadata for YouTube Studio</h4>
+                    <p className="yt-meta-panel-desc">
+                      Copy these into YouTube Studio to optimise your existing video.
+                      These are separate from the blog post content above.
+                    </p>
+                  </div>
+                  <div className="yt-meta-field">
+                    <div className="yt-meta-field-label">
+                      <span>YouTube Title</span>
+                      <span className="char-count">{freshYtTitle.length}/70</span>
+                    </div>
+                    <div className="yt-meta-copy-row">
+                      <div className="ss-text-box">{freshYtTitle}</div>
+                      <button className="btn btn-secondary ss-copy-btn" onClick={() => copyYtField("title", freshYtTitle)}>
+                        {copiedYtField === "title" ? <><Icon.Check /><span>Copied</span></> : <><Icon.Copy /><span>Copy</span></>}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="yt-meta-field">
+                    <div className="yt-meta-field-label">
+                      <span>YouTube Description</span>
+                    </div>
+                    <div className="yt-meta-copy-row">
+                      <div className="ss-text-box" style={{ whiteSpace: "pre-wrap", maxHeight: 140, overflowY: "auto" }}>{freshYtDesc}</div>
+                      <button className="btn btn-secondary ss-copy-btn" onClick={() => copyYtField("desc", freshYtDesc)}>
+                        {copiedYtField === "desc" ? <><Icon.Check /><span>Copied</span></> : <><Icon.Copy /><span>Copy</span></>}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="yt-meta-field">
+                    <div className="yt-meta-field-label">
+                      <span>Recommended Tags</span>
+                    </div>
+                    <div className="yt-meta-copy-row">
+                      <div className="ss-text-box">{freshYtTags}</div>
+                      <button className="btn btn-secondary ss-copy-btn" onClick={() => copyYtField("tags", freshYtTags)}>
+                        {copiedYtField === "tags" ? <><Icon.Check /><span>Copied</span></> : <><Icon.Copy /><span>Copy</span></>}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div style={{ display: "flex", gap: 12, marginTop: 32 }}>
                 <button className="btn btn-secondary" onClick={() => setStep(2)}>Back</button>
                 {user?.platform === "squarespace" ? (
@@ -847,7 +1030,15 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
                   ) : null}
 
                   {/* YouTube result */}
-                  {!user.youtube_refresh_token ? (
+                  {useExistingYt ? (
+                    <a href={existingYtUrl} target="_blank" rel="noopener noreferrer" className="success-link">
+                      <div className="success-link-info">
+                        <div className="success-link-label">Existing YouTube Video</div>
+                        <div className="success-link-url">{existingYtUrl}</div>
+                      </div>
+                      <Icon.External />
+                    </a>
+                  ) : !user.youtube_refresh_token ? (
                     <div className="success-link" style={{ opacity: 0.5 }}>
                       <div className="success-link-info">
                         <div className="success-link-label">YouTube not connected</div>
@@ -891,8 +1082,8 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
                 {(() => {
                   // Determine Done button state
                   const ytConnected = !!user.youtube_refresh_token;
-                  const ytStillUploading = ytConnected && ytUpload.state !== "done" && ytUpload.state !== "idle" && !ytUpload.error && ytUploadUri;
-                  const countingDown = countdown !== null && countdown > 0;
+                  const ytStillUploading = !useExistingYt && ytConnected && ytUpload.state !== "done" && ytUpload.state !== "idle" && !ytUpload.error && ytUploadUri;
+                  const countingDown = !useExistingYt && countdown !== null && countdown > 0;
                   const doneDisabled = ytStillUploading || countingDown;
 
                   let statusMsg = null;
