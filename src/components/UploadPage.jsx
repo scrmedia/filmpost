@@ -441,7 +441,8 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
                   let binary = "";
                   for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
                   const imageBase64 = btoa(binary);
-                  await fetch("/api/youtube-thumbnail", {
+                  console.log("[FilmPost] Uploading YouTube thumbnail — videoId:", data.videoId, "mimeType:", heroImageRef.current.type);
+                  const thumbRes = await fetch("/api/youtube-thumbnail", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -451,8 +452,14 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
                       mimeType: heroImageRef.current.type,
                     }),
                   });
+                  const thumbData = await thumbRes.json().catch(() => ({}));
+                  if (!thumbRes.ok) {
+                    console.error("[FilmPost] YouTube thumbnail upload failed — status:", thumbRes.status, "error:", thumbData?.error || JSON.stringify(thumbData));
+                  } else {
+                    console.log("[FilmPost] YouTube thumbnail uploaded successfully.");
+                  }
                 } catch (e) {
-                  console.error("YouTube thumbnail failed:", e.message);
+                  console.error("[FilmPost] YouTube thumbnail exception:", e.message);
                 }
               }
 
