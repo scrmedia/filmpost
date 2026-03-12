@@ -229,6 +229,8 @@ export const styles = `
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    min-width: 0;
+    overflow-x: hidden;
   }
   
   .main-header {
@@ -3134,6 +3136,12 @@ export const styles = `
     flex: 1;
     min-width: 0;
     font-size: 13px;
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    overflow: auto;
+    text-overflow: unset;
+    max-height: 160px;
   }
 
   .yt-meta-copy-row .ss-copy-btn {
