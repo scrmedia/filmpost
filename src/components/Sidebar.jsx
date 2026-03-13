@@ -14,10 +14,10 @@ export function Sidebar({ currentPage, setPage, user, onLogout }) {
 
   return (
     <aside className="sidebar">
-      <div style={{ padding: "24px 20px 20px", borderBottom: "1px solid var(--border)" }}>
+      <div style={{ padding: "28px 20px 24px", borderBottom: "1px solid var(--border)", textAlign: "center" }}>
         <h1 style={{
           fontFamily: "'Playfair Display', Georgia, serif",
-          fontSize: "28px",
+          fontSize: "36px",
           fontWeight: "700",
           lineHeight: "1",
           letterSpacing: "-0.02em",
