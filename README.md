@@ -23,14 +23,12 @@ FilmPost sends the questionnaire answers to Claude (Anthropic) and receives back
 All three are fully editable before publishing. The blog post includes an inline AI rewriter: the user can highlight any passage, type a rewrite instruction (e.g. "make this more formal" or "add more detail about the ceremony"), and accept or reject the revision. Rejected revisions return to the previous version. Every accepted rewrite is stored in a version history in Supabase so the user can compare changes over time.
 
 **Step 4 — Publish**
-On confirmation, FilmPost:
-1. Creates a WordPress draft via the WordPress REST API, sets the featured image, and returns an edit link
-2. Initiates a YouTube resumable upload session on the server
-3. Streams the video to YouTube in 4 MB chunks through a Vercel serverless proxy (to avoid CORS restrictions)
-4. Once the YouTube upload completes, fetches the video ID and injects a responsive iframe embed into the WordPress draft
-5. Updates the Supabase post record with the YouTube URL and WordPress edit URL
+On confirmation, FilmPost publishes based on the user's configured platform:
+- **WordPress** — creates a draft via the WordPress REST API, sets the featured image, streams the video to YouTube in 4 MB chunks, injects the YouTube embed into the draft, and returns an edit link
+- **Squarespace, Wix, Pixieset** — opens a step-by-step export wizard with tailored copy-paste instructions for each platform
+- **Other** — opens an HTML export panel (see below)
 
-Progress is shown in real time with a percentage bar.
+Progress is shown in real time with a percentage bar for YouTube uploads.
 
 ---
 
@@ -60,9 +58,39 @@ Version history is accessible in the History page for each post.
 
 ---
 
+### Area Roundup Post
+
+A separate content builder that generates a multi-wedding regional blog post — e.g. "5 Beautiful Weddings at Cotswold Venues". The user:
+
+1. Sets a target area and tone
+2. Selects 3–6 weddings to feature from two sources:
+   - **FilmPost history** — any previously uploaded wedding post
+   - **External YouTube URLs** — paste any YouTube URL for weddings not yet in FilmPost (e.g. older work). Duplicate URLs are detected and blocked. Each external video shows a YouTube thumbnail and accepts a venue name and optional notes.
+3. The combined selection is shown as a unified, reorderable list (up/down controls) that controls the narrative order in the Claude prompt
+4. Claude generates a full roundup blog post referencing all featured weddings with their YouTube links
+
+External videos are stored in an `external_videos` JSONB column on the `posts` table and displayed in the History page alongside FilmPost-sourced films.
+
+---
+
+### HTML export (Other platform)
+
+Users who publish on platforms outside the supported CMS list (e.g. Showit, custom sites, static HTML) can select **Other** as their publishing platform. On the Review step, the publish button is replaced by **Export HTML**, which opens a panel showing:
+
+- **Full blog HTML** — scrollable dark code block; Copy HTML button with 2-second tick feedback
+- **Meta description** — copyable with one click
+- **URL slug** — auto-derived from the post title; copyable with an SEO tip
+- **Mark as Published** — updates the post status in Supabase
+
+---
+
 ### History
 
-The History page lists all posts saved to the user's account, retrieved from the `posts` Supabase table. Each row shows the venue name, date, status, and links to the WordPress draft and YouTube video. Expanding a post shows all saved blog versions with timestamps and the ability to compare them with word-level diffs.
+The History page lists all posts saved to the user's account, retrieved from the `posts` Supabase table. Each row shows the venue name, date, status, and links to the WordPress draft and YouTube video. Expanding a post reveals:
+
+- All saved blog versions with timestamps and word-level diffs
+- SEO metadata (meta description, focus keyphrase, target keyword)
+- Featured films for Area Roundup posts — including both FilmPost-sourced weddings and externally added YouTube videos, each with a Watch link
 
 ---
 
@@ -104,13 +132,19 @@ The Profile page stores business information used in content generation:
 | Instagram, TikTok, Facebook | Social links added to the YouTube description |
 | Tone of voice | Free-text brand voice used in Claude prompts |
 | SEO plugin | Drives which metadata block is appended to blog posts |
-| Platform | Future use for platform-specific publish flows |
+| Platform | Controls the publish/export flow (WordPress, Squarespace, Wix, Pixieset, Other) |
 
 ---
 
 ## Authentication
 
 FilmPost uses a custom email/password authentication system built on top of Supabase. Passwords are hashed with bcryptjs (cost factor 10) and stored in a `password_hash` column. There is no Supabase Auth — all auth is handled by the app itself using direct table queries and localStorage session persistence.
+
+**Password reset**
+The sign-in screen includes a "Forgot your password?" link. Clicking it shows an inline email input. FilmPost calls `/api/send-reset-email`, which generates a secure `crypto.randomBytes(32)` token (1-hour expiry), stores it in the `users` table, and sends a reset link via Resend from `noreply@filmpost.app`. The reset page (`/reset-password?token=…`) validates the token, accepts a new password, hashes it with bcrypt, and redirects to the login screen.
+
+**Signup**
+The signup form includes a Confirm Password field with inline mismatch validation. The Continue button is disabled until both password fields match.
 
 ---
 
@@ -125,6 +159,7 @@ FilmPost uses a custom email/password authentication system built on top of Supa
 | AI | Anthropic Claude API (`claude-sonnet-4-6`) |
 | YouTube publishing | YouTube Data API v3 (resumable upload) |
 | WordPress publishing | WordPress REST API v2 (Application Passwords) |
+| Transactional email | Resend (`noreply@filmpost.app`) |
 | Password hashing | bcryptjs |
 
 ---
@@ -138,6 +173,7 @@ FilmPost uses a custom email/password authentication system built on top of Supa
 | `POST /api/youtube-upload` | Initiate a YouTube resumable upload session |
 | `POST /api/youtube-upload-chunk` | Proxy a single 4 MB video chunk to YouTube (avoids CORS) |
 | `POST /api/youtube-thumbnail` | Upload a thumbnail image to YouTube via the Data API |
+| `POST /api/send-reset-email` | Generate a password reset token and send reset email via Resend |
 
 ---
 
@@ -146,14 +182,14 @@ FilmPost uses a custom email/password authentication system built on top of Supa
 ### `users`
 Stores account credentials, business profile, integration tokens, and publishing preferences.
 
-Key columns: `email`, `password_hash`, `business_name`, `tagline`, `enquiry_email`, `website`, `instagram`, `tiktok`, `facebook`, `tone_of_voice`, `seo_plugin`, `platform`, `wp_url`, `wp_user`, `wp_pass`, `youtube_access_token`, `youtube_refresh_token`, `youtube_channel_name`, `featured_opt_in`, `created_at`
+Key columns: `email`, `password_hash`, `reset_token`, `reset_token_created_at`, `business_name`, `tagline`, `enquiry_email`, `website`, `instagram`, `tiktok`, `facebook`, `tone_of_voice`, `seo_plugin`, `platform`, `wp_url`, `wp_user`, `wp_pass`, `youtube_access_token`, `youtube_refresh_token`, `youtube_channel_name`, `featured_opt_in`, `created_at`
 
 ### `posts`
-One row per upload. Stores all generated content and publish results.
+One row per upload or roundup post. Stores all generated content and publish results.
 
-Key columns: `user_id`, `venue_name`, `youtube_title`, `youtube_description`, `blog_content`, `blog_versions` (jsonb array of version snapshots), `wp_edit_url`, `youtube_url`, `target_keyword`, `location`, `status`, `created_at`
+Key columns: `user_id`, `venue_name`, `youtube_title`, `youtube_description`, `blog_content`, `blog_versions` (jsonb array of version snapshots), `external_videos` (jsonb array of `{ ytUrl, videoId, venueName, notes }` for Area Roundup external sources), `wp_edit_url`, `youtube_url`, `target_keyword`, `location`, `status`, `created_at`
 
-### `venues` *(schema ready, UI coming soon)*
+### `venues`
 A reusable venue library. Saved venues can pre-fill the questionnaire on future uploads.
 
 Columns: `id`, `user_id`, `venue_name`, `location`, `style_notes`, `lighting_notes`, `prefill_data` (jsonb), `created_at`
@@ -171,6 +207,9 @@ YOUTUBE_CLIENT_SECRET=
 YOUTUBE_REDIRECT_URI=https://filmpost.vercel.app/youtube/callback
 REACT_APP_SUPABASE_URL=
 REACT_APP_SUPABASE_ANON_KEY=
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+RESEND_API_KEY=
 ```
 
 ---
