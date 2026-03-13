@@ -4,6 +4,7 @@ import { supabase, callClaude } from "../utils";
 import { SquarespaceExport } from "./SquarespaceExport";
 import { WixExport } from "./WixExport";
 import { PixiesetExport } from "./PixiesetExport";
+import OtherExport from "./OtherExport";
 
 function extractYtVideoId(url) {
   const m = (url || "").match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
@@ -49,6 +50,7 @@ export function RoundupPage({ user, posts, onDone }) {
   const [ssOpen, setSsOpen] = useState(false);
   const [wixOpen, setWixOpen] = useState(false);
   const [pixiesetOpen, setPixiesetOpen] = useState(false);
+  const [otherOpen, setOtherOpen] = useState(false);
 
   const handleHeroImageSelect = (e) => {
     const f = e.target.files?.[0];
@@ -712,6 +714,10 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
                   <button className="btn btn-primary btn-lg" onClick={() => setPixiesetOpen(true)}>
                     Export for Pixieset <Icon.Arrow />
                   </button>
+                ) : user?.platform === "other" ? (
+                  <button className="btn btn-primary btn-lg" onClick={() => setOtherOpen(true)} disabled={!savedPostId}>
+                    <Icon.Globe /> Export HTML
+                  </button>
                 ) : (
                   <button className="btn btn-primary btn-lg" onClick={publishContent}>
                     Publish Now <Icon.Arrow />
@@ -805,6 +811,16 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
           savedPostId={savedPostId}
           onClose={() => setPixiesetOpen(false)}
           onPublished={() => { setPixiesetOpen(false); setCmsPublished("Pixieset"); }}
+        />
+      )}
+      {otherOpen && (
+        <OtherExport
+          blogContent={blogContent}
+          metaDescription={youtubeDesc}
+          urlSlug={youtubeTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}
+          savedPostId={savedPostId}
+          onClose={() => setOtherOpen(false)}
+          onPublished={() => { setOtherOpen(false); setCmsPublished("Other"); }}
         />
       )}
     </>

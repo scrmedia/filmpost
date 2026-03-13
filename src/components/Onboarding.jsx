@@ -9,6 +9,7 @@ const CMS_OPTIONS = [
   { value: "squarespace", label: "Squarespace", icon: "Squarespace" },
   { value: "wix",         label: "Wix",         icon: "Wix" },
   { value: "pixieset",    label: "Pixieset",    icon: "Pixieset" },
+  { value: "other",       label: "Other",       icon: "Globe" },
 ];
 
 // Extract the 11-character YouTube video ID from any common YouTube URL format.

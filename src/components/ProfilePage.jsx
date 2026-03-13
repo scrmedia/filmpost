@@ -15,6 +15,7 @@ const PLATFORMS = [
   { value: "squarespace", label: "Squarespace", icon: "Squarespace" },
   { value: "wix",         label: "Wix",         icon: "Wix" },
   { value: "pixieset",    label: "Pixieset",    icon: "Pixieset" },
+  { value: "other",       label: "Other",       icon: "Globe" },
 ];
 
 // ── Template wireframes (pure CSS boxes, no images) ──────────────────────────

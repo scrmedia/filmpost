@@ -4,6 +4,7 @@ import { supabase, VENUE_QUESTIONS, buildBusinessFooter, callClaude } from "../u
 import { SquarespaceExport } from "./SquarespaceExport";
 import { WixExport } from "./WixExport";
 import { PixiesetExport } from "./PixiesetExport";
+import OtherExport from "./OtherExport";
 import { VenueFormPanel } from "./VenueFormPanel";
 
 const CHUNK_SIZE = 4 * 1024 * 1024; // 4 MB
@@ -110,6 +111,7 @@ export function UploadPage({ user, venues = [], onSuccess, onDone, onVenueAdded 
   const [ssOpen, setSsOpen] = useState(false);
   const [wixOpen, setWixOpen] = useState(false);
   const [pixiesetOpen, setPixiesetOpen] = useState(false);
+  const [otherOpen, setOtherOpen] = useState(false);
   const [cmsPublished, setCmsPublished] = useState(""); // CMS name shown in success message
 
   // Done button countdown (starts after YouTube upload completes)
@@ -977,6 +979,10 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
                   <button className="btn btn-primary btn-lg" onClick={() => setPixiesetOpen(true)}>
                     Export for Pixieset <Icon.Arrow />
                   </button>
+                ) : user?.platform === "other" ? (
+                  <button className="btn btn-primary btn-lg" onClick={() => setOtherOpen(true)} disabled={!savedPostId}>
+                    <Icon.Globe /> Export HTML
+                  </button>
                 ) : (
                   <button className="btn btn-primary btn-lg" onClick={publishContent}>
                     Publish Now <Icon.Arrow />
@@ -1153,6 +1159,16 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
           savedPostId={savedPostId}
           onClose={() => setPixiesetOpen(false)}
           onPublished={() => { setPixiesetOpen(false); setCmsPublished("Pixieset"); onSuccess?.(); }}
+        />
+      )}
+      {otherOpen && (
+        <OtherExport
+          blogContent={blogContent}
+          metaDescription={youtubeDesc}
+          urlSlug={youtubeTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}
+          savedPostId={savedPostId}
+          onClose={() => setOtherOpen(false)}
+          onPublished={() => { setOtherOpen(false); setCmsPublished("Other"); onSuccess?.(); }}
         />
       )}
       {saveVenueOpen && (
