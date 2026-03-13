@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap');
+  body { width: 1200px; height: 630px; overflow: hidden; background: #0a0a0b; }
+  .og-wrap { width: 1200px; height: 630px; background: #0a0a0b; position: relative; overflow: hidden; display: flex; align-items: center; font-family: 'DM Sans', sans-serif; }
+  .light-leak { position: absolute; top: -120px; right: -80px; width: 600px; height: 600px; background: radial-gradient(ellipse at center, rgba(255,210,120,0.07) 0%, rgba(255,160,60,0.04) 35%, transparent 70%); }
+  .light-leak-2 { position: absolute; bottom: -200px; left: -100px; width: 500px; height: 500px; background: radial-gradient(ellipse at center, rgba(120,160,255,0.05) 0%, transparent 65%); }
+  .film-strip-left { position: absolute; left: 0; top: 0; bottom: 0; width: 52px; background: #0d0d0e; border-right: 1px solid #1a1a1c; display: flex; flex-direction: column; align-items: center; justify-content: space-around; padding: 18px 0; z-index: 2; }
+  .film-strip-right { position: absolute; right: 0; top: 0; bottom: 0; width: 52px; background: #0d0d0e; border-left: 1px solid #1a1a1c; display: flex; flex-direction: column; align-items: center; justify-content: space-around; padding: 18px 0; z-index: 2; }
+  .sprocket { width: 22px; height: 16px; border: 1.5px solid #2a2a2e; border-radius: 3px; background: #0a0a0b; flex-shrink: 0; }
+  .content { position: relative; z-index: 3; padding: 0 96px; width: 100%; display: flex; flex-direction: column; justify-content: center; height: 100%; }
+  .eyebrow { font-size: 11px; font-weight: 500; letter-spacing: 0.22em; text-transform: uppercase; color: #c8a96e; margin-bottom: 22px; display: flex; align-items: center; gap: 10px; }
+  .eyebrow-line { width: 28px; height: 1px; background: #c8a96e; opacity: 0.6; }
+  .logo { font-family: 'Playfair Display', serif; font-size: 88px; font-weight: 700; color: #f0ece4; line-height: 1; letter-spacing: -0.02em; margin-bottom: 4px; }
+  .logo span { color: #c8a96e; font-style: italic; font-weight: 400; }
+  .tagline { font-size: 18px; font-weight: 300; color: #7a7570; letter-spacing: 0.01em; margin-top: 18px; line-height: 1.5; max-width: 560px; }
+  .tagline strong { color: #a09890; font-weight: 400; }
+  .pill-row { display: flex; gap: 10px; margin-top: 36px; align-items: center; }
+  .pill { padding: 6px 16px; border: 1px solid #2a2720; border-radius: 20px; font-size: 12px; color: #6a6460; letter-spacing: 0.06em; }
+  .pill.active { border-color: rgba(200,169,110,0.35); color: #c8a96e; background: rgba(200,169,110,0.06); }
+  .visual-block { position: absolute; right: 72px; top: 50%; transform: translateY(-50%); z-index: 3; display: flex; flex-direction: column; gap: 10px; }
+  .card-preview { width: 280px; background: #131314; border: 1px solid #222224; border-radius: 10px; padding: 16px 18px; }
+  .card-preview.top { transform: rotate(-2.5deg) translateX(-8px); opacity: 0.5; }
+  .card-preview.middle { transform: rotate(1deg); opacity: 0.85; border-color: rgba(200,169,110,0.25); }
+  .card-label { font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: #c8a96e; font-weight: 500; margin-bottom: 8px; opacity: 0.8; }
+  .card-title-line { height: 8px; background: #2a2a2e; border-radius: 4px; margin-bottom: 6px; }
+  .w100 { width: 100%; } .w85 { width: 85%; } .w75 { width: 75%; } .w55 { width: 55%; } .w40 { width: 40%; background: rgba(200,169,110,0.25); height: 6px; }
+  .card-divider { height: 1px; background: #1e1e20; margin: 10px 0; }
+  .card-meta { display: flex; gap: 6px; align-items: center; }
+  .meta-dot { width: 6px; height: 6px; border-radius: 50%; background: #c8a96e; opacity: 0.5; }
+  .meta-line { height: 6px; width: 80px; background: #2a2a2e; border-radius: 3px; }
+  .url-tag { position: absolute; bottom: 32px; right: 96px; font-size: 11px; color: #3a3830; letter-spacing: 0.08em; z-index: 4; }
+</style>
+</head>
+<body>
+<div class="og-wrap">
+  <div class="light-leak"></div>
+  <div class="light-leak-2"></div>
+  <div class="film-strip-left">
+    <div class="sprocket"></div><div class="sprocket"></div><div class="sprocket"></div><div class="sprocket"></div><div class="sprocket"></div><div class="sprocket"></div><div class="sprocket"></div><div class="sprocket"></div><div class="sprocket"></div><div class="sprocket"></div><div class="sprocket"></div><div class="sprocket"></div><div class="sprocket"></div><div class="sprocket"></div>
+  </div>
+  <div class="film-strip-right">
+    <div class="sprocket"></div><div class="sprocket"></div><div class="sprocket"></div><div class="sprocket"></div><div class="sprocket"></div><div class="sprocket"></div><div class="sprocket"></div><div class="sprocket"></div><div class="sprocket"></div><div class="sprocket"></div><div class="sprocket"></div><div class="sprocket"></div><div class="sprocket"></div><div class="sprocket"></div>
+  </div>
+  <div class="content">
+    <div class="eyebrow"><div class="eyebrow-line"></div>For wedding videographers</div>
+    <div class="logo">Film<span>Post</span></div>
+    <div class="tagline">Upload your film. Walk away with a<br><strong>YouTube publish &amp; SEO blog post.</strong></div>
+    <div class="pill-row">
+      <div class="pill active">YouTube</div>
+      <div class="pill active">WordPress</div>
+      <div class="pill">SEO</div>
+      <div class="pill">AI-generated</div>
+    </div>
+  </div>
+  <div class="visual-block">
+    <div class="card-preview top">
+      <div class="card-label">Blog post</div>
+      <div class="card-title-line w100"></div><div class="card-title-line w75"></div>
+      <div class="card-divider"></div>
+      <div class="card-title-line w85"></div><div class="card-title-line w55"></div>
+    </div>
+    <div class="card-preview middle">
+      <div class="card-label">YouTube</div>
+      <div class="card-title-line w100"></div><div class="card-title-line w75"></div>
+      <div class="card-divider"></div>
+      <div class="card-meta"><div class="meta-dot"></div><div class="meta-line"></div></div>
+      <div style="margin-top: 8px;"><div class="card-title-line w40"></div></div>
+    </div>
+  </div>
+  <div class="url-tag">filmpost.app</div>
+</div>
+</body>
+</html>
