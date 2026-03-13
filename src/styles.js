@@ -3485,4 +3485,402 @@ export const styles = `
   .yt-meta-copy-row .ss-copy-btn {
     flex-shrink: 0;
   }
+
+  /* ============================================================
+     Optimise Existing Videos
+  ============================================================ */
+
+  .optimise-video-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+
+  @media (max-width: 900px) {
+    .optimise-video-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (max-width: 600px) {
+    .optimise-video-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .optimise-video-card {
+    position: relative;
+    border: 2px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    cursor: pointer;
+    background: var(--surface);
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+
+  .optimise-video-card:hover {
+    border-color: var(--border);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  }
+
+  .optimise-video-card.selected {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+
+  .optimise-card-thumb-wrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: var(--bg);
+    overflow: hidden;
+  }
+
+  .optimise-card-thumb {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .optimise-card-thumb-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    background: var(--bg);
+  }
+
+  .optimise-card-checkbox {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    border: 2px solid rgba(255,255,255,0.85);
+    background: rgba(0,0,0,0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    transition: background 0.15s, border-color 0.15s;
+  }
+
+  .optimise-video-card.selected .optimise-card-checkbox {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .optimise-card-body {
+    padding: 12px;
+  }
+
+  .optimise-card-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    margin: 0 0 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .optimise-card-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin: 0 0 8px;
+  }
+
+  .optimise-card-meta {
+    display: flex;
+    gap: 10px;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .optimise-browse-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-subtle);
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .optimise-selection-cap-notice {
+    font-size: 13px;
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+    border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+    border-radius: var(--radius);
+    padding: 8px 12px;
+    margin-bottom: 12px;
+  }
+
+  .optimise-enrich-panel {
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    background: var(--surface);
+  }
+
+  .optimise-selection-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-subtle);
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  .optimise-summary-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .optimise-summary-thumb {
+    width: 48px;
+    height: 27px;
+    object-fit: cover;
+    border-radius: 3px;
+    flex-shrink: 0;
+    background: var(--bg);
+  }
+
+  .optimise-summary-title {
+    font-size: 13px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .optimise-generating {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 40px 20px;
+    text-align: center;
+  }
+
+  .optimise-generating-status {
+    font-size: 14px;
+    color: var(--text-muted);
+  }
+
+  .optimise-review-card {
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 20px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    background: var(--surface);
+    margin-bottom: 16px;
+  }
+
+  @media (max-width: 700px) {
+    .optimise-review-card {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .optimise-review-thumb-col {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .optimise-review-thumb {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    border-radius: var(--radius);
+    background: var(--bg);
+    display: block;
+  }
+
+  .optimise-review-video-title {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.4;
+  }
+
+  .optimise-before-after {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .optimise-field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .optimise-field-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .optimise-field-before {
+    font-size: 13px;
+    color: var(--text-muted);
+    background: var(--bg);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius);
+    padding: 8px 10px;
+    line-height: 1.5;
+    max-height: 80px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .optimise-field-after-row {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  .optimise-copy-btn {
+    flex-shrink: 0;
+    background: var(--surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius);
+    padding: 6px 8px;
+    cursor: pointer;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s, border-color 0.15s;
+  }
+
+  .optimise-copy-btn:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .optimise-tag-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .optimise-tag-chip {
+    font-size: 11px;
+    background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+    color: var(--accent);
+    border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+    border-radius: 100px;
+    padding: 2px 8px;
+  }
+
+  .optimise-approve-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .optimise-approve-label {
+    font-size: 13px;
+    color: var(--text-muted);
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .optimise-progress-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border-subtle);
+    font-size: 13px;
+    color: var(--text);
+  }
+
+  .optimise-progress-row:last-child {
+    border-bottom: none;
+  }
+
+  .optimise-progress-status {
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+
+  .optimise-progress-thumb {
+    width: 56px;
+    height: 32px;
+    object-fit: cover;
+    border-radius: 3px;
+    flex-shrink: 0;
+    background: var(--bg);
+  }
+
+  .optimise-done {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 32px 20px;
+    text-align: center;
+  }
+
+  .optimise-done-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--accent) 15%, var(--surface));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent);
+    font-size: 22px;
+  }
+
+  .optimise-steps {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+
+  .optimise-step {
+    color: var(--text-muted);
+  }
+
+  .optimise-step.active {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .optimise-step.done {
+    color: var(--accent);
+  }
+
+  .optimise-step-sep {
+    color: var(--border);
+  }
 `;

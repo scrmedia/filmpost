@@ -173,6 +173,13 @@ export function Dashboard({ user, posts, setPage }) {
                 <h4 className="quick-action-title">Area Roundup Post</h4>
                 <p className="quick-action-desc">Generate a long-form blog post targeting a regional search term — featuring multiple past weddings.</p>
               </div>
+              <div className="quick-action-card" onClick={() => setPage("optimise")}>
+                <div className="quick-action-icon">
+                  <Icon.Wand />
+                </div>
+                <h4 className="quick-action-title">Optimise Existing Videos</h4>
+                <p className="quick-action-desc">Re-generate SEO titles and descriptions for your existing YouTube uploads.</p>
+              </div>
             </div>
           </div>
           
