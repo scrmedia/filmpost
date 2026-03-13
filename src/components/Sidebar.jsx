@@ -14,14 +14,18 @@ export function Sidebar({ currentPage, setPage, user, onLogout }) {
 
   return (
     <aside className="sidebar">
-      <div className="sidebar-header">
-        <div className="logo">
-          <div className="logo-icon">FP</div>
-          <div className="logo-text">
-            <span className="logo-title">FilmPost</span>
-            <span className="logo-subtitle">Wedding Films</span>
-          </div>
-        </div>
+      <div style={{ padding: "24px 20px 20px", borderBottom: "1px solid var(--border)" }}>
+        <h1 style={{
+          fontFamily: "'Playfair Display', Georgia, serif",
+          fontSize: "28px",
+          fontWeight: "700",
+          lineHeight: "1",
+          letterSpacing: "-0.02em",
+          margin: "0"
+        }}>
+          <span style={{ color: "#f0ece4" }}>Film</span>
+          <span style={{ color: "#c8a96e", fontStyle: "italic", fontWeight: "400" }}>Post</span>
+        </h1>
       </div>
       
       <nav className="sidebar-nav">
