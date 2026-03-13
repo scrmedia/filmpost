@@ -315,7 +315,11 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
           .insert([insertPayload])
           .select()
           .single();
-        if (insertError == null && post?.id) setSavedPostId(post.id);
+        if (insertError != null) {
+          console.error("[FilmPost] Post insert error:", insertError.message, insertError);
+        } else if (post?.id) {
+          setSavedPostId(post.id);
+        }
       } catch (e) {
         console.error("[FilmPost] Exception during post insert:", e.message);
       }
@@ -445,16 +449,45 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
       }
     }
 
-    // 3. Update the existing history entry with publish results
+    // 3. Update (or insert) the history entry with publish results
     if (savedPostId) {
       try {
-        await supabase.from("posts").update({
+        const { error: updateError } = await supabase.from("posts").update({
           wp_edit_url: wp?.editUrl || null,
           wp_post_id: wpPostIdRef.current || null,
           status: uploadUri ? "uploading" : "published",
         }).eq("id", savedPostId);
+        if (updateError != null) console.error("[FilmPost] Post update error:", updateError.message, updateError);
       } catch (e) {
-        console.error("Failed to update post:", e.message);
+        console.error("[FilmPost] Failed to update post:", e.message);
+      }
+    } else {
+      // Fallback: initial insert in generateContent() failed — try again now with publish data
+      try {
+        const fallbackPayload = {
+          user_id: user.id,
+          venue: venueName,
+          yt_title: youtubeTitle,
+          yt_description: youtubeDesc,
+          blog_content: blogContent,
+          wp_edit_url: wp?.editUrl || null,
+          wp_post_id: wpPostIdRef.current || null,
+          status: uploadUri ? "uploading" : "published",
+          video_source: useExistingYt ? "existing" : "uploaded",
+          ...(useExistingYt ? { yt_url: existingYtUrl } : {}),
+        };
+        const { data: post, error: insertError } = await supabase
+          .from("posts")
+          .insert([fallbackPayload])
+          .select()
+          .single();
+        if (insertError != null) {
+          console.error("[FilmPost] Fallback post insert error:", insertError.message, insertError);
+        } else if (post?.id) {
+          setSavedPostId(post.id);
+        }
+      } catch (e) {
+        console.error("[FilmPost] Exception during fallback post insert:", e.message);
       }
     }
 
