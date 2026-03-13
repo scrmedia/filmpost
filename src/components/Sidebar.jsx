@@ -3,9 +3,10 @@ import { Icon } from "../icons";
 export function Sidebar({ currentPage, setPage, user, onLogout }) {
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: Icon.Dashboard },
-    { id: "upload", label: "New Upload", icon: Icon.Upload },
+    { id: "upload", label: "New Post", icon: Icon.Upload },
     { id: "history", label: "History", icon: Icon.History },
     { id: "optimise", label: "Optimise Videos", icon: Icon.Wand },
+    { id: "roundup", label: "Area Roundup", icon: Icon.MapPin },
     { id: "venues", label: "Venues", icon: Icon.MapPin },
     { id: "settings", label: "Settings", icon: Icon.Settings },
     { id: "profile", label: "Profile", icon: Icon.User },

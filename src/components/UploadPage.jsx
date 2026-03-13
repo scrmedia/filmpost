@@ -588,7 +588,7 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
   if (loading) {
     return (
       <>
-        <div className="main-header"><div><h1 className="page-title">New Upload</h1></div></div>
+        <div className="main-header"><div><h1 className="page-title">New Post</h1></div></div>
         <div className="main-body">
           <div className="card">
             <div className="card-body">
@@ -608,7 +608,7 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
     <>
       <div className="main-header">
         <div>
-          <h1 className="page-title">New Upload</h1>
+          <h1 className="page-title">New Post</h1>
           <p className="page-description">Upload a wedding film and generate content automatically.</p>
         </div>
       </div>

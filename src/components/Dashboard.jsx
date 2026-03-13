@@ -48,7 +48,7 @@ export function Dashboard({ user, posts, setPage }) {
         </div>
         <div className="header-actions hide-on-mobile">
           <button className="btn btn-primary" onClick={() => setPage("upload")}>
-            <Icon.Plus /> New Upload
+            <Icon.Plus /> New Post
           </button>
         </div>
       </div>
@@ -147,7 +147,7 @@ export function Dashboard({ user, posts, setPage }) {
                 <div className="quick-action-icon">
                   <Icon.Upload />
                 </div>
-                <h4 className="quick-action-title">New Upload</h4>
+                <h4 className="quick-action-title">New Post</h4>
                 <p className="quick-action-desc">Upload a wedding film to YouTube and generate a blog post with AI.</p>
               </div>
               <div className="quick-action-card" onClick={() => setPage("settings")}>
