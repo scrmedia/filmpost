@@ -2167,6 +2167,94 @@ export const styles = `
     background: var(--surface-elevated);
   }
 
+  /* ── Other Platform HTML Export ─────────────────────────────────────────────── */
+
+  .other-export-panel {
+    max-width: 720px;
+  }
+
+  .other-export-body {
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .other-export-hint {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin: 0;
+  }
+
+  .other-export-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .other-export-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .other-export-section-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .other-export-code {
+    background: #1a1a2e;
+    color: #e2e8f0;
+    border-radius: 8px;
+    padding: 16px;
+    font-size: 12px;
+    font-family: monospace;
+    overflow-y: auto;
+    max-height: 400px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin: 0;
+  }
+
+  .other-export-meta-text {
+    font-size: 13px;
+    color: var(--text);
+    background: var(--surface-alt, var(--surface));
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin: 0;
+  }
+
+  .other-export-slug {
+    font-size: 13px;
+    font-family: monospace;
+    background: var(--surface-alt, var(--surface));
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    display: block;
+  }
+
+  .other-export-seo-tip {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin: 0;
+  }
+
+  .other-export-published-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    color: var(--success, #10b981);
+    font-weight: 500;
+  }
+
   /* ── Venue Library ─────────────────────────────────────────────────────────── */
 
   .venue-grid {
