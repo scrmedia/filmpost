@@ -305,7 +305,17 @@ export function Onboarding({ onComplete }) {
       >
         <div className="onboarding-card">
           <div className="onboarding-logo">
-            <h1>FilmPost</h1>
+            <h1 style={{
+              fontFamily: "'Playfair Display', Georgia, serif",
+              fontSize: "clamp(48px, 8vw, 72px)",
+              fontWeight: "700",
+              lineHeight: "1",
+              letterSpacing: "-0.02em",
+              margin: "0 0 12px 0"
+            }}>
+              <span style={{ color: "#f0ece4" }}>Film</span>
+              <span style={{ color: "#c8a96e", fontStyle: "italic", fontWeight: "400" }}>Post</span>
+            </h1>
             <p>Automated publishing for wedding videographers</p>
           </div>
 
