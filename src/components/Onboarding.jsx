@@ -28,11 +28,22 @@ export function Onboarding({ onComplete }) {
     tagline: "", enquiry_email: "", website: "", instagram: "", tiktok: "", facebook: "",
     wp_url: "", wp_user: "", wp_pass: "", platform: "",
   });
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [confirmPasswordError, setConfirmPasswordError] = useState("");
   const [createdUser, setCreatedUser] = useState(null); // set after account creation, used in step 3
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [wpSaved, setWpSaved] = useState(false);
   const [ytLoading, setYtLoading] = useState(false);
+
+  // Forgot password flow
+  const [forgotPassword, setForgotPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [resetSent, setResetSent] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+
+  // Success message from password reset redirect
+  const resetSuccess = new URLSearchParams(window.location.search).get("reset") === "success";
 
   // ── Background video state ──────────────────────────────────────────────────
   const [filmPool, setFilmPool] = useState([]);
@@ -131,6 +142,24 @@ export function Onboarding({ onComplete }) {
     }
   };
 
+  // ── Forgot password ────────────────────────────────────────────────────────
+  const handleForgotPassword = async (e) => {
+    e?.preventDefault();
+    setResetLoading(true);
+    try {
+      await fetch("/api/send-reset-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: forgotEmail }),
+      });
+    } catch (_) {
+      // Silent — always show success for security
+    } finally {
+      setResetSent(true);
+      setResetLoading(false);
+    }
+  };
+
   // ── Signup ─────────────────────────────────────────────────────────────────
   const handleSignup = async (e) => {
     e?.preventDefault();
@@ -138,6 +167,10 @@ export function Onboarding({ onComplete }) {
     try {
       if (step === 1) {
         if (!form.name || !form.email || !form.password) throw new Error("All fields required");
+        if (form.password !== confirmPassword) {
+          setConfirmPasswordError("Passwords do not match");
+          setLoading(false); return;
+        }
         setStep(2); setLoading(false); return;
       }
       if (step === 2) {
@@ -278,21 +311,87 @@ export function Onboarding({ onComplete }) {
           <div className="card">
             <div className="card-body">
               {isLogin ? (
-                /* ── Login form ── */
-                <form onSubmit={handleLogin}>
-                  <div className="field">
-                    <label className="label">Email</label>
-                    <input className="input" type="email" value={form.email} onChange={e => update("email", e.target.value)} placeholder="you@example.com" />
+                /* ── Login form / Forgot password ── */
+                forgotPassword ? (
+                  <div>
+                    {resetSent ? (
+                      <>
+                        <p style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 20, lineHeight: 1.6 }}>
+                          If an account exists for that email, a reset link is on its way.
+                        </p>
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          style={{ padding: 0, fontSize: 13 }}
+                          onClick={() => { setForgotPassword(false); setResetSent(false); setForgotEmail(""); }}
+                        >
+                          ← Back to sign in
+                        </button>
+                      </>
+                    ) : (
+                      <form onSubmit={handleForgotPassword}>
+                        <h3 style={{ marginBottom: 8, fontSize: 18 }}>Reset your password</h3>
+                        <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 20, lineHeight: 1.5 }}>
+                          Enter your email and we'll send you a reset link.
+                        </p>
+                        <div className="field">
+                          <label className="label">Email</label>
+                          <input
+                            className="input"
+                            type="email"
+                            value={forgotEmail}
+                            onChange={e => setForgotEmail(e.target.value)}
+                            placeholder="you@example.com"
+                            autoFocus
+                          />
+                        </div>
+                        <button
+                          className="btn btn-primary btn-lg"
+                          style={{ width: "100%", marginBottom: 12 }}
+                          disabled={!forgotEmail.trim() || resetLoading}
+                        >
+                          {resetLoading ? <span className="spinner"></span> : "Send Reset Link"}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          style={{ padding: 0, fontSize: 13 }}
+                          onClick={() => { setForgotPassword(false); setForgotEmail(""); }}
+                        >
+                          ← Back to sign in
+                        </button>
+                      </form>
+                    )}
                   </div>
-                  <div className="field">
-                    <label className="label">Password</label>
-                    <input className="input" type="password" value={form.password} onChange={e => update("password", e.target.value)} placeholder="Enter your password" />
-                  </div>
-                  {error && <div className="alert alert-error">{error}</div>}
-                  <button className="btn btn-primary btn-lg" style={{ width: "100%" }} disabled={loading}>
-                    {loading ? <span className="spinner"></span> : "Sign In"}
-                  </button>
-                </form>
+                ) : (
+                  <form onSubmit={handleLogin}>
+                    {resetSuccess && (
+                      <div className="alert alert-success" style={{ marginBottom: 16 }}>
+                        Your password has been updated. Please sign in.
+                      </div>
+                    )}
+                    <div className="field">
+                      <label className="label">Email</label>
+                      <input className="input" type="email" value={form.email} onChange={e => update("email", e.target.value)} placeholder="you@example.com" />
+                    </div>
+                    <div className="field">
+                      <label className="label">Password</label>
+                      <input className="input" type="password" value={form.password} onChange={e => update("password", e.target.value)} placeholder="Enter your password" />
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        style={{ padding: 0, fontSize: 12, marginTop: 6, color: "var(--text-muted)" }}
+                        onClick={() => { setForgotPassword(true); setForgotEmail(form.email); setError(""); }}
+                      >
+                        Forgot your password?
+                      </button>
+                    </div>
+                    {error && <div className="alert alert-error">{error}</div>}
+                    <button className="btn btn-primary btn-lg" style={{ width: "100%" }} disabled={loading}>
+                      {loading ? <span className="spinner"></span> : "Sign In"}
+                    </button>
+                  </form>
+                )
               ) : step === 3 ? (
                 /* ── Step 3: Connect integrations ── */
                 <div>
@@ -385,7 +484,20 @@ export function Onboarding({ onComplete }) {
                       </div>
                       <div className="field">
                         <label className="label">Password</label>
-                        <input className="input" type="password" value={form.password} onChange={e => update("password", e.target.value)} placeholder="Create a password" />
+                        <input className="input" type="password" value={form.password} onChange={e => { update("password", e.target.value); setConfirmPasswordError(""); }} placeholder="Create a password" />
+                      </div>
+                      <div className="field">
+                        <label className="label">Confirm Password</label>
+                        <input
+                          className="input"
+                          type="password"
+                          value={confirmPassword}
+                          onChange={e => { setConfirmPassword(e.target.value); setConfirmPasswordError(""); }}
+                          placeholder="Repeat your password"
+                        />
+                        {confirmPasswordError && (
+                          <p style={{ fontSize: 12, color: "var(--error)", marginTop: 4 }}>{confirmPasswordError}</p>
+                        )}
                       </div>
                     </>
                   ) : (
@@ -400,8 +512,12 @@ export function Onboarding({ onComplete }) {
                     </>
                   )}
                   {error && <div className="alert alert-error">{error}</div>}
-                  <button className="btn btn-primary btn-lg" style={{ width: "100%" }} disabled={loading}>
-                    {loading ? <span className="spinner"></span> : step === 1 ? "Continue" : "Continue"}
+                  <button
+                    className="btn btn-primary btn-lg"
+                    style={{ width: "100%" }}
+                    disabled={loading || (step === 1 && (!form.name || !form.email || !form.password || !confirmPassword || form.password !== confirmPassword))}
+                  >
+                    {loading ? <span className="spinner"></span> : "Continue"}
                   </button>
                   {step === 2 && (
                     <button type="button" className="btn btn-ghost" style={{ width: "100%", marginTop: 12 }} onClick={() => setStep(1)}>
@@ -411,11 +527,11 @@ export function Onboarding({ onComplete }) {
                 </form>
               )}
 
-              {step !== 3 && (
+              {step !== 3 && !forgotPassword && (
                 <>
                   <div className="divider-text"><span>or</span></div>
                   <button className="btn btn-secondary" style={{ width: "100%" }}
-                    onClick={() => { setIsLogin(!isLogin); setStep(1); setError(""); }}>
+                    onClick={() => { setIsLogin(!isLogin); setStep(1); setError(""); setConfirmPassword(""); setConfirmPasswordError(""); }}>
                     {isLogin ? "Create an Account" : "Sign In Instead"}
                   </button>
                 </>

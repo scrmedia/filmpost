@@ -12,8 +12,10 @@ import { ProfilePage } from "./components/ProfilePage";
 import { VenuePage } from "./components/VenuePage";
 import { YouTubeCallback } from "./components/YouTubeCallback";
 import { RoundupPage } from "./components/RoundupPage";
+import { ResetPasswordPage } from "./components/ResetPasswordPage";
 
 const isYTCallback = window.location.pathname === "/youtube/callback";
+const isResetPassword = window.location.pathname === "/reset-password";
 
 const isMobile = () => window.innerWidth <= 768;
 
@@ -84,6 +86,15 @@ export default function App() {
     setUser(u);
     localStorage.setItem("filmpost_user", JSON.stringify(u));
   };
+
+  if (isResetPassword) {
+    return (
+      <>
+        <style>{styles}</style>
+        <ResetPasswordPage />
+      </>
+    );
+  }
 
   if (isYTCallback) {
     return (
