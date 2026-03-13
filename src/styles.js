@@ -1802,8 +1802,9 @@ export const styles = `
 
     .main-content {
       margin-left: 0;
-      /* Extra bottom padding so content isn't hidden behind the bottom nav */
-      padding-bottom: 72px;
+      /* Extra bottom padding so content isn't hidden behind the bottom nav.
+         Add safe-area-inset-bottom so the nav bar clears the iOS home indicator. */
+      padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
     }
 
     .main-header {
@@ -1831,7 +1832,7 @@ export const styles = `
       display: block;
       background: var(--surface-elevated);
       border-bottom: 1px solid var(--border-subtle);
-      padding: 10px 20px;
+      padding: 12px 20px;
       font-size: 13px;
       color: var(--text-secondary);
       text-align: center;
@@ -1887,6 +1888,70 @@ export const styles = `
       font-size: 10px;
       font-weight: 500;
       letter-spacing: 0.02em;
+    }
+
+    /* ── Mobile history card layout ────────────────────────────────────────────
+       Switch from flex row to CSS grid so the title text gets the full second
+       column width instead of competing with the status pill, delete btn, and
+       chevron on a single line.  Layout:
+         [thumb]  [title / meta / yt-link]  [delete]  [chevron]
+         [thumb]  [status pill            ]
+    ── */
+    .upload-item {
+      display: grid;
+      grid-template-columns: 60px 1fr auto auto;
+      grid-template-rows: auto auto;
+      column-gap: 12px;
+      row-gap: 0;
+      padding: 16px;
+      align-items: start;
+    }
+
+    .upload-thumbnail {
+      grid-column: 1;
+      grid-row: 1 / 3;
+      width: 60px;
+      height: 60px;
+      align-self: start;
+    }
+
+    .upload-info {
+      grid-column: 2;
+      grid-row: 1;
+      min-width: 0;
+    }
+
+    .upload-status {
+      grid-column: 2;
+      grid-row: 2;
+      margin-top: 6px;
+      align-self: center;
+    }
+
+    /* Delete button: always visible on touch (no hover state on mobile) */
+    .upload-item--deletable .upload-delete-btn {
+      grid-column: 3;
+      grid-row: 1;
+      opacity: 1;
+      align-self: start;
+    }
+
+    .upload-expand-chevron {
+      grid-column: 4;
+      grid-row: 1;
+      padding: 0 4px;
+      align-self: start;
+    }
+
+    /* Allow meta chips to wrap onto multiple lines on narrow screens */
+    .upload-meta {
+      flex-wrap: wrap;
+      gap: 4px 8px;
+    }
+
+    /* Give YouTube link a little more breathing room */
+    .upload-yt-row {
+      margin-top: 6px;
     }
   }
 
