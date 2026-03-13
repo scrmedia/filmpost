@@ -5,10 +5,14 @@ import { SquarespaceExport } from "./SquarespaceExport";
 import { WixExport } from "./WixExport";
 import { PixiesetExport } from "./PixiesetExport";
 
+function extractYtVideoId(url) {
+  const m = (url || "").match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  return m ? m[1] : null;
+}
+
 function getYtThumbnail(ytUrl) {
-  if (!ytUrl) return null;
-  const match = ytUrl.match(/[?&]v=([^&]+)/);
-  return match ? `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg` : null;
+  const id = extractYtVideoId(ytUrl);
+  return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : null;
 }
 
 export function RoundupPage({ user, posts, onDone }) {
@@ -16,7 +20,15 @@ export function RoundupPage({ user, posts, onDone }) {
   const [targetArea, setTargetArea] = useState("");
   const [targetKeyword, setTargetKeyword] = useState("");
   const [additionalNotes, setAdditionalNotes] = useState("");
-  const [selectedPostIds, setSelectedPostIds] = useState([]);
+
+  // orderedSelection = combined ordered list controlling narrative order in the prompt
+  // history item:  { source: "history", postId: string }
+  // external item: { source: "external", id: string, ytUrl: string, videoId: string, venueName: string, notes: string }
+  const [orderedSelection, setOrderedSelection] = useState([]);
+
+  // External URL input
+  const [externalUrlInput, setExternalUrlInput] = useState("");
+  const [externalUrlError, setExternalUrlError] = useState("");
 
   // Hero image (optional — used as WordPress featured image)
   const [heroImage, setHeroImage] = useState(null);
@@ -38,7 +50,6 @@ export function RoundupPage({ user, posts, onDone }) {
   const [wixOpen, setWixOpen] = useState(false);
   const [pixiesetOpen, setPixiesetOpen] = useState(false);
 
-  // Keep heroImageRef in sync for the publish step
   const handleHeroImageSelect = (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -48,21 +59,78 @@ export function RoundupPage({ user, posts, onDone }) {
     heroImageRef.current = f;
   };
 
-  // All posts available for selection (any with content)
+  // ── Derived state ───────────────────────────────────────────────────────────
   const availablePosts = (posts || []).filter(p => p.post_type !== "roundup");
-  const selectedPosts = availablePosts.filter(p => selectedPostIds.includes(p.id));
+  const selectedPostIds = orderedSelection.filter(x => x.source === "history").map(x => x.postId);
+  const externalVideos = orderedSelection.filter(x => x.source === "external");
+  const totalSelected = orderedSelection.length;
+  const selectedPosts = selectedPostIds.map(id => availablePosts.find(p => p.id === id)).filter(Boolean);
 
-  const togglePost = (id) => {
-    setSelectedPostIds(prev =>
-      prev.includes(id)
-        ? prev.filter(x => x !== id)
-        : prev.length < 6 ? [...prev, id] : prev
+  // ── Handlers ────────────────────────────────────────────────────────────────
+  const togglePost = (post) => {
+    setOrderedSelection(prev => {
+      const isSelected = prev.some(x => x.source === "history" && x.postId === post.id);
+      if (isSelected) {
+        return prev.filter(x => !(x.source === "history" && x.postId === post.id));
+      } else if (prev.length < 6) {
+        return [...prev, { source: "history", postId: post.id }];
+      }
+      return prev;
+    });
+  };
+
+  const addExternalVideo = () => {
+    const videoId = extractYtVideoId(externalUrlInput.trim());
+    if (!videoId) {
+      setExternalUrlError("Please enter a valid YouTube URL.");
+      return;
+    }
+    const alreadyExternal = externalVideos.some(v => v.videoId === videoId);
+    const alreadyInHistory = selectedPosts.some(p => extractYtVideoId(p.yt_url) === videoId);
+    if (alreadyExternal || alreadyInHistory) {
+      setExternalUrlError("This video has already been added.");
+      return;
+    }
+    if (totalSelected >= 6) {
+      setExternalUrlError("Maximum 6 videos reached.");
+      return;
+    }
+    setOrderedSelection(prev => [...prev, {
+      source: "external",
+      id: crypto.randomUUID(),
+      ytUrl: externalUrlInput.trim(),
+      videoId,
+      venueName: "",
+      notes: "",
+    }]);
+    setExternalUrlInput("");
+    setExternalUrlError("");
+  };
+
+  const updateExternalVideo = (id, field, value) => {
+    setOrderedSelection(prev =>
+      prev.map(x => x.source === "external" && x.id === id ? { ...x, [field]: value } : x)
     );
+  };
+
+  const removeFromSelection = (item) => {
+    setOrderedSelection(prev =>
+      prev.filter(x => x.source === "history" ? x.postId !== item.postId : x.id !== item.id)
+    );
+  };
+
+  const moveItem = (index, direction) => {
+    setOrderedSelection(prev => {
+      const next = [...prev];
+      const swap = index + direction;
+      if (swap < 0 || swap >= next.length) return prev;
+      [next[index], next[swap]] = [next[swap], next[index]];
+      return next;
+    });
   };
 
   const handleAreaChange = (val) => {
     setTargetArea(val);
-    // Auto-suggest keyword only if user hasn't manually edited it
     setTargetKeyword(prev => {
       if (!prev || prev === `Wedding videographer in ${targetArea}`) {
         return val ? `Wedding videographer in ${val}` : "";
@@ -71,8 +139,15 @@ export function RoundupPage({ user, posts, onDone }) {
     });
   };
 
-  // ── Generate ───────────────────────────────────────────────────────────────
+  // ── Generate ────────────────────────────────────────────────────────────────
   const generateContent = async () => {
+    // Validate external video venue names before generating
+    const missingVenues = externalVideos.filter(v => !v.venueName.trim());
+    if (missingVenues.length > 0) {
+      setError("Please add a venue name for each external video — this is needed to generate quality content.");
+      return;
+    }
+
     setLoading(true);
     setLoadingMsg("Crafting your roundup post with AI...");
     setError("");
@@ -82,20 +157,33 @@ export function RoundupPage({ user, posts, onDone }) {
         : "";
       const systemPrompt = `You are a wedding videographer writing about your own work. Write like a real person who films weddings for a living — warm, genuine, and specific to the day. Use plain British English. No fancy words, no flowery language, no corporate tone. Write short sentences. Be direct. Sound human. Never use these words or phrases: breathtaking, stunning, magical, timeless, seamlessly, meticulously, elegant, bespoke, enchanting, nestled, picturesque, idyllic, effortlessly, truly, really special, or any em dashes (—).${toneInstruction}`;
 
-      const postSummaries = selectedPosts.map((p, i) => {
-        const summary = p.blog_content
-          ? p.blog_content.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300)
-          : "";
-        const ytId = p.yt_url?.match(/[?&]v=([^&]+)/)?.[1];
-        return [
-          `Wedding ${i + 1}: ${p.yt_title || p.venue || "Untitled"}`,
-          `Venue: ${p.venue || "Unknown"}`,
-          `Date: ${new Date(p.created_at).toLocaleDateString("en-GB", { month: "long", year: "numeric" })}`,
-          p.yt_url ? `YouTube URL: ${p.yt_url}` : "",
-          ytId ? `YouTube Embed ID: ${ytId}` : "",
-          summary ? `Content summary: ${summary}` : "",
-        ].filter(Boolean).join("\n");
-      }).join("\n\n---\n\n");
+      // Build combined summaries from orderedSelection, preserving the user's chosen order
+      const allSummaries = orderedSelection.map((item, i) => {
+        if (item.source === "history") {
+          const p = availablePosts.find(x => x.id === item.postId);
+          if (!p) return null;
+          const summary = p.blog_content
+            ? p.blog_content.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300)
+            : "";
+          const ytId = extractYtVideoId(p.yt_url);
+          return [
+            `Wedding ${i + 1}: ${p.yt_title || p.venue || "Untitled"}`,
+            `Venue: ${p.venue || "Unknown"}`,
+            `Date: ${new Date(p.created_at).toLocaleDateString("en-GB", { month: "long", year: "numeric" })}`,
+            p.yt_url ? `YouTube URL: ${p.yt_url}` : "",
+            ytId ? `YouTube Embed ID: ${ytId}` : "",
+            summary ? `Content summary: ${summary}` : "",
+          ].filter(Boolean).join("\n");
+        } else {
+          return [
+            `Wedding ${i + 1}: ${item.venueName}`,
+            `Venue: ${item.venueName}`,
+            `YouTube URL: ${item.ytUrl}`,
+            `YouTube Embed ID: ${item.videoId}`,
+            item.notes ? `Notes: ${item.notes}` : "",
+          ].filter(Boolean).join("\n");
+        }
+      }).filter(Boolean).join("\n\n---\n\n");
 
       const seoPlugin = user?.seo_plugin || "";
       const seoSection = seoPlugin === "yoast"
@@ -114,8 +202,8 @@ export function RoundupPage({ user, posts, onDone }) {
 TARGET AREA: ${targetArea}
 TARGET KEYWORD: ${targetKeyword}${additionalNotes ? `\nADDITIONAL CONTEXT: ${additionalNotes}` : ""}
 
-FEATURED WEDDINGS (reference each one in the post):
-${postSummaries}
+FEATURED WEDDINGS (reference each one in the post, in the order listed):
+${allSummaries}
 
 Write like a videographer who was actually at each wedding. Use plain, conversational British English. Short paragraphs. Short sentences. No em dashes. No words like stunning, magical, breathtaking, timeless, seamlessly, meticulously, nestled, or picturesque.
 
@@ -181,7 +269,7 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
       // Meta description
       const desc = await callClaude(
         systemPrompt,
-        `Write a meta description (under 155 characters) for a blog post about wedding videography in ${targetArea}. Target keyword: "${targetKeyword}". Mention that it covers ${selectedPosts.length} real weddings. Return ONLY the description text, no quotes.`
+        `Write a meta description (under 155 characters) for a blog post about wedding videography in ${targetArea}. Target keyword: "${targetKeyword}". Mention that it covers ${totalSelected} real weddings. Return ONLY the description text, no quotes.`
       );
       setYoutubeDesc(desc.trim());
 
@@ -199,6 +287,7 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
             status: "draft",
             post_type: "roundup",
             featured_post_ids: selectedPostIds,
+            external_videos: externalVideos.map(({ ytUrl, videoId, venueName, notes }) => ({ ytUrl, videoId, venueName, notes })),
           }])
           .select()
           .single();
@@ -216,7 +305,7 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
     }
   };
 
-  // ── Publish ────────────────────────────────────────────────────────────────
+  // ── Publish ─────────────────────────────────────────────────────────────────
   const publishContent = async () => {
     setLoading(true);
     setError("");
@@ -285,7 +374,7 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
     setStep(4);
   };
 
-  // ── Loading screen ─────────────────────────────────────────────────────────
+  // ── Loading screen ──────────────────────────────────────────────────────────
   if (loading) {
     return (
       <>
@@ -419,28 +508,30 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
             </div>
             <div className="card-body">
               <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 8, marginTop: 0 }}>
-                Choose 3–6 weddings to feature in this roundup.
+                Choose 3–6 weddings to feature in this roundup. Mix posts from your history and external YouTube URLs.
               </p>
-              <p style={{ fontSize: 12, color: selectedPostIds.length >= 3 ? "var(--accent)" : "var(--text-muted)", marginBottom: 16, fontWeight: 500 }}>
-                {selectedPostIds.length} selected{selectedPostIds.length >= 6 ? " — maximum reached" : selectedPostIds.length >= 3 ? "" : ` — select at least ${3 - selectedPostIds.length} more`}
+              <p style={{ fontSize: 12, color: totalSelected >= 3 ? "var(--accent)" : "var(--text-muted)", marginBottom: 16, fontWeight: 500 }}>
+                {totalSelected} selected{totalSelected >= 6 ? " — maximum reached" : totalSelected >= 3 ? "" : ` — select at least ${3 - totalSelected} more`}
               </p>
+
+              {/* FilmPost history grid */}
               {availablePosts.length === 0 ? (
                 <div className="empty-state">
                   <div className="empty-icon"><Icon.Film /></div>
                   <h4 className="empty-title">No posts yet</h4>
-                  <p className="empty-desc">Create some standard wedding posts first, then come back to build a roundup.</p>
+                  <p className="empty-desc">Create some standard wedding posts first, or add external YouTube URLs below.</p>
                 </div>
               ) : (
                 <div className="roundup-post-grid">
                   {availablePosts.map(post => {
                     const selected = selectedPostIds.includes(post.id);
                     const thumb = getYtThumbnail(post.yt_url);
-                    const disabled = !selected && selectedPostIds.length >= 6;
+                    const disabled = !selected && totalSelected >= 6;
                     return (
                       <div
                         key={post.id}
                         className={`roundup-post-card${selected ? " roundup-post-card--selected" : ""}${disabled ? " roundup-post-card--disabled" : ""}`}
-                        onClick={() => !disabled && togglePost(post.id)}
+                        onClick={() => !disabled && togglePost(post)}
                       >
                         {selected && (
                           <div className="roundup-post-card-check"><Icon.Check /></div>
@@ -465,11 +556,120 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
                   })}
                 </div>
               )}
+
+              {/* External YouTube URL input */}
+              <div className="external-video-section">
+                <h4 className="external-video-heading">Add a YouTube video</h4>
+                <p className="external-video-hint">Paste a YouTube URL for a wedding not in your FilmPost history.</p>
+                <div className="external-video-input-row">
+                  <input
+                    className="input"
+                    value={externalUrlInput}
+                    onChange={e => { setExternalUrlInput(e.target.value); setExternalUrlError(""); }}
+                    placeholder="https://www.youtube.com/watch?v=..."
+                    disabled={totalSelected >= 6}
+                    onKeyDown={e => e.key === "Enter" && addExternalVideo()}
+                  />
+                  <button
+                    className="btn btn-secondary"
+                    onClick={addExternalVideo}
+                    disabled={!externalUrlInput.trim() || totalSelected >= 6}
+                  >
+                    Add Video
+                  </button>
+                </div>
+                {externalUrlError && <p className="external-video-error">{externalUrlError}</p>}
+              </div>
+
+              {/* Combined reorderable selection list */}
+              {orderedSelection.length > 0 && (
+                <div className="selection-list">
+                  <h4 className="selection-list-heading">Your selection — drag to reorder</h4>
+                  {orderedSelection.map((item, index) => {
+                    const isHistory = item.source === "history";
+                    const post = isHistory ? availablePosts.find(p => p.id === item.postId) : null;
+                    const thumb = isHistory
+                      ? getYtThumbnail(post?.yt_url)
+                      : `https://img.youtube.com/vi/${item.videoId}/hqdefault.jpg`;
+
+                    return (
+                      <div key={isHistory ? item.postId : item.id} className="selection-list-item">
+                        {/* Reorder controls */}
+                        <div className="selection-list-reorder">
+                          <button
+                            className="selection-list-reorder-btn"
+                            onClick={() => moveItem(index, -1)}
+                            disabled={index === 0}
+                            title="Move up"
+                          >
+                            <Icon.ChevronUp />
+                          </button>
+                          <span className="selection-list-index">{index + 1}</span>
+                          <button
+                            className="selection-list-reorder-btn"
+                            onClick={() => moveItem(index, 1)}
+                            disabled={index === orderedSelection.length - 1}
+                            title="Move down"
+                          >
+                            <Icon.ChevronDown />
+                          </button>
+                        </div>
+
+                        {/* Thumbnail */}
+                        <div className="selection-list-thumb">
+                          {thumb
+                            ? <img src={thumb} alt="" />
+                            : <div className="selection-list-no-thumb"><Icon.Video /></div>
+                          }
+                        </div>
+
+                        {/* Info / editable fields */}
+                        <div className="selection-list-info">
+                          {isHistory ? (
+                            <>
+                              <div className="selection-list-venue">{post?.venue || "Unknown venue"}</div>
+                              <div className="selection-list-meta">
+                                {post?.created_at && new Date(post.created_at).toLocaleDateString("en-GB", { month: "short", year: "numeric" })}
+                                {!post?.yt_url && <span className="selection-list-no-yt"> · No YouTube link</span>}
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <input
+                                className="input selection-list-venue-input"
+                                value={item.venueName}
+                                onChange={e => updateExternalVideo(item.id, "venueName", e.target.value)}
+                                placeholder="Venue name (required)"
+                              />
+                              <textarea
+                                className="textarea selection-list-notes-input"
+                                value={item.notes}
+                                onChange={e => updateExternalVideo(item.id, "notes", e.target.value)}
+                                placeholder="Optional notes about this wedding…"
+                              />
+                            </>
+                          )}
+                        </div>
+
+                        {/* Remove */}
+                        <button
+                          className="selection-list-remove"
+                          onClick={() => removeFromSelection(item)}
+                          title="Remove"
+                        >
+                          <Icon.X />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
               <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
                 <button className="btn btn-secondary" onClick={() => setStep(1)}>Back</button>
                 <button
                   className="btn btn-primary btn-lg"
-                  disabled={selectedPostIds.length < 3}
+                  disabled={totalSelected < 3}
                   onClick={generateContent}
                 >
                   Generate Post <Icon.Arrow />

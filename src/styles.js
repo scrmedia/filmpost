@@ -2815,6 +2815,191 @@ export const styles = `
     font-style: italic;
   }
 
+  /* External YouTube video input section */
+  .external-video-section {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+
+  .external-video-heading {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    margin: 0 0 4px;
+  }
+
+  .external-video-hint {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin: 0 0 12px;
+  }
+
+  .external-video-input-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .external-video-input-row .input {
+    flex: 1;
+  }
+
+  .external-video-error {
+    font-size: 12px;
+    color: var(--error);
+    margin: 6px 0 0;
+  }
+
+  /* Combined reorderable selection list */
+  .selection-list {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .selection-list-heading {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin: 0 0 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .selection-list-item {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+
+  .selection-list-reorder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+  }
+
+  .selection-list-reorder-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    padding: 2px 4px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s, background 0.15s;
+  }
+
+  .selection-list-reorder-btn:hover:not(:disabled) {
+    color: var(--text);
+    background: var(--border);
+  }
+
+  .selection-list-reorder-btn:disabled {
+    opacity: 0.25;
+    cursor: default;
+  }
+
+  .selection-list-index {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    min-width: 16px;
+    text-align: center;
+  }
+
+  .selection-list-thumb {
+    width: 80px;
+    flex-shrink: 0;
+    aspect-ratio: 16 / 9;
+    border-radius: 4px;
+    overflow: hidden;
+    background: var(--border);
+  }
+
+  .selection-list-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .selection-list-no-thumb {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+  }
+
+  .selection-list-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .selection-list-venue {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .selection-list-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .selection-list-no-yt {
+    color: var(--text-secondary);
+    font-style: italic;
+  }
+
+  .selection-list-venue-input {
+    font-size: 13px;
+  }
+
+  .selection-list-notes-input {
+    font-size: 12px;
+    min-height: 52px;
+    resize: vertical;
+  }
+
+  .selection-list-remove {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    padding: 4px 6px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s, background 0.15s;
+    align-self: flex-start;
+  }
+
+  .selection-list-remove:hover {
+    color: var(--error);
+    background: color-mix(in srgb, var(--error) 10%, transparent);
+  }
+
   /* YouTube link and keyword in history row */
   .upload-yt-row {
     display: flex;

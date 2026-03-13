@@ -76,6 +76,8 @@ function PostInfo({ post, allPosts, seoPlugin }) {
   const featuredPosts = (post.featured_post_ids || [])
     .map(id => allPosts.find(p => p.id === id))
     .filter(Boolean);
+  const externalFilms = post.external_videos || [];
+  const totalFilmsCount = featuredPosts.length + externalFilms.length;
 
   return (
     <div className="post-info-section">
@@ -104,9 +106,9 @@ function PostInfo({ post, allPosts, seoPlugin }) {
         )}
 
         {/* Featured films toggle (roundup only) */}
-        {featuredPosts.length > 0 && (
+        {totalFilmsCount > 0 && (
           <button className="post-info-toggle" onClick={() => setFilmsOpen(o => !o)}>
-            {featuredPosts.length} Featured Film{featuredPosts.length !== 1 ? "s" : ""} {filmsOpen ? "▲" : "▼"}
+            {totalFilmsCount} Featured Film{totalFilmsCount !== 1 ? "s" : ""} {filmsOpen ? "▲" : "▼"}
           </button>
         )}
       </div>
@@ -124,7 +126,7 @@ function PostInfo({ post, allPosts, seoPlugin }) {
       )}
 
       {/* Featured films list */}
-      {filmsOpen && featuredPosts.length > 0 && (
+      {filmsOpen && totalFilmsCount > 0 && (
         <div className="post-featured-films">
           {featuredPosts.map(fp => (
             <div key={fp.id} className="post-featured-film">
@@ -141,6 +143,19 @@ function PostInfo({ post, allPosts, seoPlugin }) {
               ) : (
                 <span className="post-featured-film-no-yt">No video</span>
               )}
+            </div>
+          ))}
+          {externalFilms.map((v, i) => (
+            <div key={`ext-${i}`} className="post-featured-film">
+              <span className="post-featured-film-venue">{v.venueName || "External venue"}</span>
+              <a
+                href={v.ytUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="post-featured-film-link"
+              >
+                <Icon.YouTube /> Watch
+              </a>
             </div>
           ))}
         </div>
