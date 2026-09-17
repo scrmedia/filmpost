@@ -117,8 +117,8 @@ export async function analyseFilm({ fileName, frames, duration, transcript, venu
 File name: "${fileName}"
 Saved venue library: ${library}
 
-Speech transcript (Whisper; background music can produce nonsense lines, ignore anything that doesn't read as real speech):
-${transcript || "(no usable speech)"}
+Speech transcript from the film's audio (Whisper). Speeches and vows are usually mixed under music, so skip only the odd garbled line and use all real speech. Speech is your best source for names, places, jokes and personal moments:
+${transcript || "(no speech was picked up)"}
 
 Work out the venue. Prefer, in order: the file name (match it to the venue library if you can), then venue names spoken or shown on screen, then a visual guess. Never invent a venue.
 
@@ -130,10 +130,12 @@ Return ONLY a JSON object, no code fences:
 ${fields}
   },
   "summary": "4-6 sentences on what actually happens in the film, in order, with timestamps",
+  "speech": ["the most personal or memorable things said in the vows, speeches or readings, quoted as heard, with who said it if clear"],
   "details": ["specific, true details a couple would recognise: weather, season, flowers, dress, cars, readings, speeches, first dance song if named"]
 }
 
-For each answer, describe only what you saw or heard. Use an empty string when the film gives no evidence. coupleNames only if names are clearly spoken or shown. venueWebsite stays empty unless it appears on screen.` },
+Write plainly in British English. Never use em dashes or en dashes.
+For each answer, describe only what you saw or heard, and fold in what was said where it fits (standoutMemory especially). Use an empty string when the film gives no evidence. coupleNames only if names are clearly spoken or shown. venueWebsite stays empty unless it appears on screen.` },
   ];
   const raw = await callClaude(
     "You are a wedding videographer reviewing your own edited film to write about it. Be literal and specific. British English.",

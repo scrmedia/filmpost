@@ -7,6 +7,7 @@ import { PixiesetExport } from "./PixiesetExport";
 import OtherExport from "./OtherExport";
 import { VenueFormPanel } from "./VenueFormPanel";
 import { extractFrames, transcribeFilm, analyseFilm } from "../videoAnalysis";
+import { humanize } from "../humanizer";
 
 const CHUNK_SIZE = 4 * 1024 * 1024; // 4 MB
 
@@ -200,13 +201,21 @@ export function UploadPage({ user, venues = [], onSuccess, onDone, onVenueAdded 
       } catch (e) {
         console.warn("[FilmPost] Transcription failed, continuing with visuals only:", e.message);
       }
+      console.info("[FilmPost] Transcript:", transcript || "(none)");
       setLoadingMsg("Picking out the details...");
       const a = await analyseFilm({ fileName: f.name, frames, duration, transcript, venues });
 
       const name = (a.venueName || "").trim();
       const lib = venues.find(v => v.venue_name.toLowerCase() === name.toLowerCase()) || null;
       const answers = { ...nonEmpty(a.answers), ...(lib ? nonEmpty(libraryAnswers(lib)) : {}) };
-      const notes = [a.summary, ...(a.details || []).map(d => `- ${d}`)].filter(Boolean).join("\n");
+      const said = (a.speech || []).map(q => `- ${q}`);
+      const notes = [
+        a.summary,
+        ...(a.details || []).map(d => `- ${d}`),
+        "",
+        said.length ? "What was said:" : transcript ? "What was said: nothing clear enough to quote." : "What was said: no speech was picked up from the audio.",
+        ...said,
+      ].join("\n").trim();
       setVenueName(name); setVenueQuery(name);
       setSelectedLibraryVenue(lib);
       setVenueAnswers(answers);
@@ -290,8 +299,7 @@ export function UploadPage({ user, venues = [], onSuccess, onDone, onVenueAdded 
       setYoutubeTitle(title.trim());
 
       const footer = buildBusinessFooter(user);
-      const desc = await callClaude(systemPrompt, `Write a YouTube description for this wedding film:\nVenue: ${vn}\n${fullAnswersText}\n\nStart with a short, natural opening sentence or two about the day — written like a videographer talking about a wedding they genuinely loved filming. Then cover the filming highlights in plain, specific language. No em dashes. No fancy adjectives. Just honest, warm copy.\n\nEnd with this exact footer:\n\n${footer}\n\nUnder 4000 characters. Return ONLY the description text.`);
-      setYoutubeDesc(desc.trim());
+      const desc = await callClaude(systemPrompt, `Write a YouTube description for this wedding film:\nVenue: ${vn}\n${fullAnswersText}\n\nStart with a short, natural opening sentence or two about the day, written like a videographer talking about a wedding they genuinely loved filming. Then cover the filming highlights in plain, specific language. No em dashes. No fancy adjectives. Just honest, warm copy.\n\nDon't add contact details or a sign-off; a business footer is added after your text. Under 3500 characters. Return ONLY the description text.`);
 
       const tags = await callClaude(systemPrompt, `Generate 12 YouTube tags for a wedding film at "${vn}". Target search phrase: "${keyword}".${seoContext}\n\nWedding details:\n${fullAnswersText.slice(0, 1500)}\n\nMix the venue, the area, and what couples search for. Return ONLY a comma-separated list of tags, no other text.`);
       setYtTags(tags.trim());
@@ -386,9 +394,18 @@ OUTBOUND LINK: ${answers.venueWebsite ? `Include one natural outbound link to th
 HTML tags allowed: <script> (JSON-LD only), <h1>, <h2>, <h3>, <p>, <strong>, <a> (for the venue outbound link only). No <html>, <body>, or <head> tags.
 ${seoSection}
 Return ONLY the JSON-LD block followed by the blog post HTML.`);
+      setLoadingMsg("Polishing the writing...");
+      const keepPhrases = [keyword, vn, seo?.secondaryKeyword].filter(Boolean);
+      const [humanDesc, humanBlog] = await Promise.all([
+        humanize(desc, { keywords: keepPhrases }),
+        humanize(blog, { keywords: keepPhrases, html: true }),
+      ]);
+      const fullDesc = `${humanDesc}\n\n${footer}`;
+      setYoutubeDesc(fullDesc);
+
       const finalBlog = user.blog_template === "film_suppliers"
-        ? assembleTemplate2Html(blog.trim(), supplierCredits, answers.coupleNames, user.business_name || "")
-        : blog.trim();
+        ? assembleTemplate2Html(humanBlog, supplierCredits, answers.coupleNames, user.business_name || "")
+        : humanBlog;
       setBlogContent(finalBlog);
 
       // Save history entry immediately — before any publish attempt
@@ -397,7 +414,7 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
           user_id: user.id,
           venue: vn,
           yt_title: title.trim(),
-          yt_description: desc.trim(),
+          yt_description: fullDesc,
           blog_content: finalBlog,
           status: "draft",
           target_keyword: keyword,
