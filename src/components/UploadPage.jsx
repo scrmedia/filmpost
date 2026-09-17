@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Icon } from "../icons";
 import { supabase, VENUE_QUESTIONS, buildBusinessFooter, callClaude } from "../utils";
 import { SquarespaceExport } from "./SquarespaceExport";
@@ -6,6 +6,7 @@ import { WixExport } from "./WixExport";
 import { PixiesetExport } from "./PixiesetExport";
 import OtherExport from "./OtherExport";
 import { VenueFormPanel } from "./VenueFormPanel";
+import { extractFrames, transcribeFilm, analyseFilm } from "../videoAnalysis";
 
 const CHUNK_SIZE = 4 * 1024 * 1024; // 4 MB
 
@@ -21,6 +22,15 @@ const CREDIT_FIELDS = [
   { key: "stationery",   label: "Stationery" },
   { key: "dress",        label: "Dress" },
 ];
+
+// Questionnaire answers already saved against a Venue Library entry
+const libraryAnswers = (v) => ({
+  lightingNotes: v.lighting_notes || "",
+  filmingHighlights: v.filming_highlights || "",
+  venueWebsite: v.website_url || "",
+  venueStyle: v.style_notes || (v.venue_type ? `${v.venue_type} venue` : ""),
+});
+const nonEmpty = (o) => Object.fromEntries(Object.entries(o || {}).filter(([, v]) => typeof v === "string" && v.trim()));
 
 // Assemble Template 2 HTML from Claude's standard output
 function assembleTemplate2Html(claudeOutput, credits, coupleNames, businessName) {
@@ -79,6 +89,10 @@ export function UploadPage({ user, venues = [], onSuccess, onDone, onVenueAdded 
   const [youtubeTitle, setYoutubeTitle] = useState("");
   const [youtubeDesc, setYoutubeDesc] = useState("");
   const [blogContent, setBlogContent] = useState("");
+  const [ytTags, setYtTags] = useState("");
+  const [targetKeyword, setTargetKeyword] = useState("");
+  const [filmNotes, setFilmNotes] = useState("");
+  const [autoNotice, setAutoNotice] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState("");
   const [error, setError] = useState("");
@@ -157,15 +171,61 @@ export function UploadPage({ user, venues = [], onSuccess, onDone, onVenueAdded 
   };
 
   // ── File handling ──────────────────────────────────────────────────────────
-  const handleDrop = useCallback((e) => {
-    e.preventDefault(); setDragOver(false);
-    const f = e.dataTransfer?.files?.[0];
-    if (f && f.type.startsWith("video/")) setFile(f);
-  }, []);
+  const pickFile = (f) => {
+    if (!f || !f.type.startsWith("video/")) return;
+    setFile(f);
+    autoRun(f);
+  };
 
-  const handleFileSelect = (e) => {
-    const f = e.target.files?.[0];
-    if (f && f.type.startsWith("video/")) setFile(f);
+  const handleDrop = (e) => {
+    e.preventDefault(); setDragOver(false);
+    pickFile(e.dataTransfer?.files?.[0]);
+  };
+
+  const handleFileSelect = (e) => pickFile(e.target.files?.[0]);
+
+  // ── Auto pipeline: watch → listen → analyse → (confirm venue) → research + write ──
+  const autoRun = async (f) => {
+    setLoading(true); setError(""); setAutoNotice("");
+    try {
+      const { duration, frames } = await extractFrames(f, {
+        onProgress: (i, n) => setLoadingMsg(`Watching your film (frame ${i} of ${n})...`),
+      });
+      setLoadingMsg("Listening to the audio...");
+      let transcript = "";
+      try {
+        transcript = await transcribeFilm(f, {
+          onProgress: (i, n) => setLoadingMsg(`Listening to speeches and vows (part ${i} of ${n})...`),
+        });
+      } catch (e) {
+        console.warn("[FilmPost] Transcription failed, continuing with visuals only:", e.message);
+      }
+      setLoadingMsg("Picking out the details...");
+      const a = await analyseFilm({ fileName: f.name, frames, duration, transcript, venues });
+
+      const name = (a.venueName || "").trim();
+      const lib = venues.find(v => v.venue_name.toLowerCase() === name.toLowerCase()) || null;
+      const answers = { ...nonEmpty(a.answers), ...(lib ? nonEmpty(libraryAnswers(lib)) : {}) };
+      const notes = [a.summary, ...(a.details || []).map(d => `- ${d}`)].filter(Boolean).join("\n");
+      setVenueName(name); setVenueQuery(name);
+      setSelectedLibraryVenue(lib);
+      setVenueAnswers(answers);
+      setFilmNotes(notes);
+      setStep(2);
+
+      if (!name || a.venueSource !== "filename") {
+        setAutoNotice(name
+          ? `We think this was filmed at ${name} (from the ${a.venueSource === "speech" ? "speeches" : "footage"}). Check the venue name, then click Generate Content.`
+          : "We couldn't tell the venue from the file name or the film. Add it below, then click Generate Content. Tip: name files like \"Venue Name - Couple.mp4\" to skip this step.");
+        return;
+      }
+      await generateContent({ venueName: name, answers, libraryVenue: lib, filmNotes: notes });
+    } catch (e) {
+      setStep(2);
+      setError(`Couldn't watch the film automatically (${e.message}). Fill in the details below instead.`);
+    } finally {
+      setLoading(false); setLoadingMsg("");
+    }
   };
 
   const handleHeroImageSelect = (e) => {
@@ -177,32 +237,64 @@ export function UploadPage({ user, venues = [], onSuccess, onDone, onVenueAdded 
   };
 
   // ── Generate content ───────────────────────────────────────────────────────
-  const generateContent = async () => {
-    setLoading(true); setLoadingMsg("Crafting your content with AI..."); setError("");
+  // opts lets the auto pipeline pass values before React state has updated
+  const generateContent = async (opts = {}) => {
+    const vn = opts.venueName ?? venueName;
+    const answers = opts.answers ?? venueAnswers;
+    const libVenue = opts.libraryVenue !== undefined ? opts.libraryVenue : selectedLibraryVenue;
+    const notes = opts.filmNotes ?? filmNotes;
+    setLoading(true); setLoadingMsg("Researching keywords..."); setError("");
     try {
+      let seo = null;
+      try {
+        const r = await fetch("/api/seo-research", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ venue: vn }),
+        });
+        const d = await r.json().catch(() => ({}));
+        if (r.ok) seo = d; else console.warn("[FilmPost] SEO research failed:", d.error);
+      } catch (e) {
+        console.warn("[FilmPost] SEO research failed:", e.message);
+      }
+      const keyword = seo?.primaryKeyword || `${vn} wedding videographer`;
+      setTargetKeyword(keyword);
+      const seoContext = seo ? [
+        "\n\nKEYWORD RESEARCH (live Google UK data):",
+        seo.keywords.length && `Searches people make (monthly volume): ${seo.keywords.map(k => `${k.keyword} (${k.volume})`).join(", ")}`,
+        seo.questions.length && `Questions Google shows under "People also ask": ${seo.questions.join(" | ")}`,
+        seo.related.length && `Related searches: ${seo.related.join(", ")}`,
+        seo.topPages.length && `Pages currently on page 1: ${seo.topPages.map(p => `${p.title} (${p.domain})`).join(" | ")}`,
+      ].filter(Boolean).join("\n") : "";
+      setLoadingMsg("Writing your content...");
+
       const toneInstruction = user?.tone_of_voice
         ? `\n\nWrite in a style that reflects this brand voice: ${user.tone_of_voice}`
         : "";
       const systemPrompt = `You are a wedding videographer writing about your own work. Write like a real person who films weddings for a living — warm, genuine, and specific to the day. Use plain British English. No fancy words, no flowery language, no corporate tone. Write short sentences. Be direct. Sound human. Never use these words or phrases: breathtaking, stunning, magical, timeless, seamlessly, meticulously, elegant, bespoke, enchanting, nestled, picturesque, idyllic, effortlessly, truly, really special, or any em dashes (—).${toneInstruction}`;
-      const answersText = VENUE_QUESTIONS.map(q => venueAnswers[q.id] ? `${q.label}: ${venueAnswers[q.id]}` : "").filter(Boolean).join("\n");
+      const answersText = VENUE_QUESTIONS.map(q => answers[q.id] ? `${q.label}: ${answers[q.id]}` : "").filter(Boolean).join("\n");
 
       // Enrich prompt with saved venue library details if a library venue was selected
-      const venueLibraryContext = selectedLibraryVenue ? [
+      const venueLibraryContext = libVenue ? [
         "\n\nAdditional venue details from saved library:",
-        selectedLibraryVenue.venue_type && `Venue type: ${selectedLibraryVenue.venue_type}`,
-        selectedLibraryVenue.location && `Location: ${selectedLibraryVenue.location}`,
-        selectedLibraryVenue.indoor_outdoor && `Setting: ${selectedLibraryVenue.indoor_outdoor}`,
-        selectedLibraryVenue.capacity && `Capacity: ${selectedLibraryVenue.capacity}`,
-        selectedLibraryVenue.general_notes && `General notes: ${selectedLibraryVenue.general_notes}`,
+        libVenue.venue_type && `Venue type: ${libVenue.venue_type}`,
+        libVenue.location && `Location: ${libVenue.location}`,
+        libVenue.indoor_outdoor && `Setting: ${libVenue.indoor_outdoor}`,
+        libVenue.capacity && `Capacity: ${libVenue.capacity}`,
+        libVenue.general_notes && `General notes: ${libVenue.general_notes}`,
       ].filter(Boolean).join("\n") : "";
-      const fullAnswersText = answersText + venueLibraryContext;
+      const filmContext = notes ? `\n\nWhat actually happens in the film (from watching it):\n${notes}` : "";
+      const fullAnswersText = answersText + venueLibraryContext + filmContext;
 
-      const title = await callClaude(systemPrompt, `Write a YouTube title for a wedding film at "${venueName}".\n\n${fullAnswersText}\n\nInclude the venue name. If the questionnaire includes a couple's names, you may include them. Keep it under 70 characters. Sound natural, not like a magazine headline. Return ONLY the title, no quotes.`);
+      const title = await callClaude(systemPrompt, `Write a YouTube title for a wedding film at "${vn}".\n\n${fullAnswersText}\n\nInclude the venue name and, if it reads naturally, the search phrase "${keyword}". If the questionnaire includes a couple's names, you may include them. Keep it under 70 characters. Sound natural, not like a magazine headline. Return ONLY the title, no quotes.`);
       setYoutubeTitle(title.trim());
 
       const footer = buildBusinessFooter(user);
-      const desc = await callClaude(systemPrompt, `Write a YouTube description for this wedding film:\nVenue: ${venueName}\n${fullAnswersText}\n\nStart with a short, natural opening sentence or two about the day — written like a videographer talking about a wedding they genuinely loved filming. Then cover the filming highlights in plain, specific language. No em dashes. No fancy adjectives. Just honest, warm copy.\n\nEnd with this exact footer:\n\n${footer}\n\nUnder 4000 characters. Return ONLY the description text.`);
+      const desc = await callClaude(systemPrompt, `Write a YouTube description for this wedding film:\nVenue: ${vn}\n${fullAnswersText}\n\nStart with a short, natural opening sentence or two about the day — written like a videographer talking about a wedding they genuinely loved filming. Then cover the filming highlights in plain, specific language. No em dashes. No fancy adjectives. Just honest, warm copy.\n\nEnd with this exact footer:\n\n${footer}\n\nUnder 4000 characters. Return ONLY the description text.`);
       setYoutubeDesc(desc.trim());
+
+      const tags = await callClaude(systemPrompt, `Generate 12 YouTube tags for a wedding film at "${vn}". Target search phrase: "${keyword}".${seoContext}\n\nWedding details:\n${fullAnswersText.slice(0, 1500)}\n\nMix the venue, the area, and what couples search for. Return ONLY a comma-separated list of tags, no other text.`);
+      setYtTags(tags.trim());
 
       const seoPlugin = user?.seo_plugin || "";
       const seoSection = seoPlugin === "yoast" ? `
@@ -212,7 +304,7 @@ After the main blog post HTML, append this section EXACTLY as shown (labels and 
 <!-- YOAST SEO -->
 SEO Title: [max 60 characters, include venue name and keyword]
 Meta Description: [max 155 characters, compelling summary]
-Focus Keyphrase: [single keyword or short phrase]
+Focus Keyphrase: ${keyword}
 Slug: [url-friendly, lowercase, hyphens, no domain]
 <!-- END YOAST SEO -->`
         : seoPlugin === "rankmath" ? `
@@ -222,7 +314,7 @@ After the main blog post HTML, append this section EXACTLY as shown (labels and 
 <!-- RANK MATH SEO -->
 SEO Title: [max 60 characters, include venue name and keyword]
 Meta Description: [max 155 characters, compelling summary]
-Focus Keyword: [single keyword or short phrase]
+Focus Keyword: ${keyword}
 Canonical Slug: [url-friendly, lowercase, hyphens, no domain]
 <!-- END RANK MATH SEO -->`
         : seoPlugin === "aioseo" ? `
@@ -232,16 +324,16 @@ After the main blog post HTML, append this section EXACTLY as shown (labels and 
 <!-- ALL IN ONE SEO -->
 Post Title: [max 60 characters, include venue name and keyword]
 Meta Description: [max 160 characters, compelling summary]
-Focus Keyphrase: [single keyword or short phrase]
+Focus Keyphrase: ${keyword}
 Slug: [url-friendly, lowercase, hyphens, no domain]
 <!-- END ALL IN ONE SEO -->`
         : "";
 
       const businessName = user?.business_name || "the videographer";
       const businessUrl = user?.website || "";
-      const blog = await callClaude(systemPrompt, `Write an SEO-optimised blog post (900-1200 words) for a wedding videographer's website about filming a wedding at "${venueName}".
+      const blog = await callClaude(systemPrompt, `Write an SEO-optimised blog post (900-1200 words) for a wedding videographer's website about filming a wedding at "${vn}".
 
-${fullAnswersText}
+${fullAnswersText}${seoContext}
 
 Write like a videographer who was actually there. Use plain, conversational British English. Short paragraphs. Short sentences. No em dashes. No words like stunning, magical, breathtaking, timeless, seamlessly, meticulously, nestled, or picturesque.
 
@@ -263,7 +355,7 @@ Output a <script type="application/ld+json"> block using VideoObject schema:
   },
   "contentLocation": {
     "@type": "Place",
-    "name": "${venueName}"
+    "name": "${vn}"
   }
 }
 
@@ -271,30 +363,31 @@ Output a <script type="application/ld+json"> block using VideoObject schema:
 
 <h1>: A plain, specific headline naming the venue. No clever wordplay.
 
-INTRODUCTION (2-3 sentences in a <p> tag): The first sentence must include the exact phrase "${venueName} wedding videographer". Summarise the post clearly. Name the venue, its location, and what made the day stand out. Write it so someone googling the venue gets a direct, useful answer.
+INTRODUCTION (2-3 sentences in a <p> tag): The first sentence must include the exact phrase "${keyword}". Summarise the post clearly. Name the venue, its location, and what made the day stand out. Write it so someone googling the venue gets a direct, useful answer.
 
-SEO KEYPHRASE: The target keyphrase is "${venueName} wedding videographer". Beyond the introduction, it must also appear naturally in at least one H2 or H3 heading, and in the meta description if an SEO plugin block is requested below.
+SEO KEYPHRASE: The target keyphrase is "${keyword}"${seo?.secondaryKeyword ? ` (also work in "${seo.secondaryKeyword}" once)` : ""}. Beyond the introduction, it must also appear naturally in at least one H2 or H3 heading, and in the meta description if an SEO plugin block is requested below.
 
 BODY SECTIONS using H2 headings phrased as questions couples actually search for:
-- "What is ${venueName} like as a wedding venue?"
-- "What is it like to film a wedding at ${venueName}?"
-- "Why do couples choose ${venueName}?"
+- "What is ${vn} like as a wedding venue?"
+- "What is it like to film a wedding at ${vn}?"
+- "Why do couples choose ${vn}?"
+If the keyword research lists "People also ask" questions that fit this venue, use them as H2s or FAQ questions instead, worded exactly as searched.
 Use H3 sub-headings where they help. Keep paragraphs to 2-4 sentences. Reference the venue's county or region where you can. Use specific details from the questionnaire — real moments, not generic descriptions.
 
 CALL TO ACTION — one final <p> with one <strong> phrase: Keep it short and genuine. One or two sentences. Not salesy.
 
 3. FAQ SECTION
-<h2>Frequently Asked Questions about Weddings at ${venueName}</h2>
+<h2>Frequently Asked Questions about Weddings at ${vn}</h2>
 
 3-4 Q&As using <h3> for questions and <p> for answers. Base answers on the questionnaire details. If you don't know something like guest numbers, write around it rather than making it up.
 
-OUTBOUND LINK: ${venueAnswers.venueWebsite ? `Include one natural outbound link to the venue's own website (${venueAnswers.venueWebsite}). Use the venue name "${venueName}" as the anchor text. Place it where it reads naturally in context — do not force it.` : "No venue website has been provided, so do not invent or guess a URL."}
+OUTBOUND LINK: ${answers.venueWebsite ? `Include one natural outbound link to the venue's own website (${answers.venueWebsite}). Use the venue name "${vn}" as the anchor text. Place it where it reads naturally in context — do not force it.` : "No venue website has been provided, so do not invent or guess a URL."}
 
 HTML tags allowed: <script> (JSON-LD only), <h1>, <h2>, <h3>, <p>, <strong>, <a> (for the venue outbound link only). No <html>, <body>, or <head> tags.
 ${seoSection}
 Return ONLY the JSON-LD block followed by the blog post HTML.`);
       const finalBlog = user.blog_template === "film_suppliers"
-        ? assembleTemplate2Html(blog.trim(), supplierCredits, venueAnswers.coupleNames, user.business_name || "")
+        ? assembleTemplate2Html(blog.trim(), supplierCredits, answers.coupleNames, user.business_name || "")
         : blog.trim();
       setBlogContent(finalBlog);
 
@@ -302,11 +395,12 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
       try {
         const insertPayload = {
           user_id: user.id,
-          venue: venueName,
+          venue: vn,
           yt_title: title.trim(),
           yt_description: desc.trim(),
           blog_content: finalBlog,
           status: "draft",
+          target_keyword: keyword,
           video_source: useExistingYt ? "existing" : "uploaded",
           ...(useExistingYt ? { yt_url: existingYtUrl } : {}),
         };
@@ -325,15 +419,15 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
       }
 
       // Show save-to-library banner if this venue isn't already in the library
-      const alreadySaved = venues.some(v => v.venue_name.toLowerCase() === venueName.toLowerCase());
+      const alreadySaved = venues.some(v => v.venue_name.toLowerCase() === vn.toLowerCase());
       if (!alreadySaved) setShowSaveBanner(true);
 
       // Generate fresh YouTube metadata if user opted in (existing video mode)
       if (useExistingYt && regenYtMeta) {
         try {
-          const fTitle = await callClaude(systemPrompt, `Write a fresh SEO-optimised YouTube title for a wedding film at "${venueName}".\n\n${fullAnswersText}\n\nInclude the venue name. If the questionnaire includes a couple's names, you may include them. Keep it under 70 characters. Sound natural, not like a magazine headline. Return ONLY the title, no quotes.`);
-          const fDesc  = await callClaude(systemPrompt, `Write a YouTube description for this wedding film:\nVenue: ${venueName}\n${fullAnswersText}\n\nStart with a short, natural opening sentence or two about the day — written like a videographer talking about a wedding they genuinely loved filming. Then cover the filming highlights in plain, specific language. No em dashes. No fancy adjectives.\n\nEnd with this exact footer:\n\n${buildBusinessFooter(user)}\n\nUnder 4000 characters. Return ONLY the description text.`);
-          const fTags  = await callClaude(systemPrompt, `Generate 12 relevant YouTube tags for a wedding film at "${venueName}". ${answersText ? `Wedding details: ${answersText.slice(0, 300)}` : ""} Return ONLY a comma-separated list of tags, no other text or explanation.`);
+          const fTitle = await callClaude(systemPrompt, `Write a fresh SEO-optimised YouTube title for a wedding film at "${vn}".\n\n${fullAnswersText}\n\nInclude the venue name. If the questionnaire includes a couple's names, you may include them. Keep it under 70 characters. Sound natural, not like a magazine headline. Return ONLY the title, no quotes.`);
+          const fDesc  = await callClaude(systemPrompt, `Write a YouTube description for this wedding film:\nVenue: ${vn}\n${fullAnswersText}\n\nStart with a short, natural opening sentence or two about the day — written like a videographer talking about a wedding they genuinely loved filming. Then cover the filming highlights in plain, specific language. No em dashes. No fancy adjectives.\n\nEnd with this exact footer:\n\n${buildBusinessFooter(user)}\n\nUnder 4000 characters. Return ONLY the description text.`);
+          const fTags  = await callClaude(systemPrompt, `Generate 12 relevant YouTube tags for a wedding film at "${vn}". ${answersText ? `Wedding details: ${answersText.slice(0, 300)}` : ""} Return ONLY a comma-separated list of tags, no other text or explanation.`);
           setFreshYtTitle(fTitle.trim());
           setFreshYtDesc(fDesc.trim());
           setFreshYtTags(fTags.trim());
@@ -438,7 +532,7 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
         const res = await fetch("/api/youtube-upload", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title: youtubeTitle, description: youtubeDesc, tags: [], refreshToken: user.youtube_refresh_token }),
+          body: JSON.stringify({ title: youtubeTitle, description: youtubeDesc, tags: ytTags.split(",").map(t => t.trim()).filter(Boolean), refreshToken: user.youtube_refresh_token }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to initiate upload");
@@ -717,6 +811,7 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
                   <input id="fileInput" type="file" accept="video/*" hidden onChange={handleFileSelect} />
                   <div className="upload-zone-icon">{file ? <Icon.Check /> : <Icon.Upload />}</div>
                   <h3 className="upload-zone-title">{file ? file.name : "Drop your video here"}</h3>
+                  {!file && <p className="upload-zone-desc">AI watches the film, researches keywords and writes everything. Name the file after the venue to skip all questions.</p>}
                   <p className="upload-zone-desc">{file ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : "or click to browse"}</p>
                 </div>
               )}
@@ -739,6 +834,13 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
           <div className="card">
             <div className="card-header"><h3 className="card-title">Tell us about the venue</h3></div>
             <div className="card-body">
+              {autoNotice && <div className="alert alert-info" style={{ marginBottom: 20 }}>{autoNotice}</div>}
+              {filmNotes && (
+                <div className="field">
+                  <label className="label">What AI saw in the film <span className="label-hint">(used in the content, edit freely)</span></label>
+                  <textarea className="textarea" value={filmNotes} onChange={e => setFilmNotes(e.target.value)} style={{ minHeight: 120 }} />
+                </div>
+              )}
               <div className="field">
                 <label className="label">Venue Name</label>
                 <div className="venue-autocomplete">
@@ -773,13 +875,7 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
                             setSelectedLibraryVenue(v);
                             setShowVenueSuggestions(false);
                             // Pre-fill questionnaire answers from library
-                            setVenueAnswers(prev => ({
-                              ...prev,
-                              lightingNotes: v.lighting_notes || prev.lightingNotes || "",
-                              filmingHighlights: v.filming_highlights || prev.filmingHighlights || "",
-                              venueWebsite: v.website_url || prev.venueWebsite || "",
-                              venueStyle: v.style_notes || (v.venue_type ? `${v.venue_type} venue` : prev.venueStyle || ""),
-                            }));
+                            setVenueAnswers(prev => ({ ...prev, ...nonEmpty(libraryAnswers(v)) }));
                           }}
                         >
                           <div className="venue-suggestion-name">{v.venue_name}</div>
@@ -909,7 +1005,7 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
 
               <div style={{ display: "flex", gap: 12, marginTop: 32 }}>
                 <button className="btn btn-secondary" onClick={() => setStep(1)}>Back</button>
-                <button className="btn btn-primary btn-lg" disabled={!venueName} onClick={generateContent}>
+                <button className="btn btn-primary btn-lg" disabled={!venueName} onClick={() => generateContent()}>
                   Generate Content <Icon.Arrow />
                 </button>
               </div>
@@ -945,7 +1041,16 @@ Return ONLY the JSON-LD block followed by the blog post HTML.`);
                 <textarea className="textarea" value={youtubeDesc} onChange={e => setYoutubeDesc(e.target.value)} style={{ minHeight: 200 }} />
                 <div className="char-count">{youtubeDesc.length}/5000</div>
               </div>
+              {!useExistingYt && (
+                <div className="field">
+                  <label className="label">YouTube Tags <span className="label-hint">(comma separated)</span></label>
+                  <input className="input" value={ytTags} onChange={e => setYtTags(e.target.value)} />
+                </div>
+              )}
               <div className="divider"></div>
+              {targetKeyword && (
+                <p className="form-hint" style={{ marginBottom: 12 }}>Target keyword: <strong>{targetKeyword}</strong></p>
+              )}
               <div className="field">
                 <label className="label">Blog Post</label>
                 <textarea className="textarea" value={blogContent} onChange={e => setBlogContent(e.target.value)} style={{ minHeight: 300 }} />

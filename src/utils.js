@@ -39,7 +39,7 @@ export async function callClaude(systemPrompt, userPrompt) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-5",
       max_tokens: 4000,
       system: systemPrompt,
       messages: [{ role: "user", content: userPrompt }],
