@@ -40,15 +40,19 @@ export function buildBusinessFooter(user) {
   return lines.filter((l, i, a) => !(l === "" && a[i - 1] === "")).join("\n");
 }
 
-export async function callClaude(systemPrompt, userPrompt) {
+// schema: JSON schema for guaranteed-valid JSON output. betas/fallbacks pass through the proxy.
+export async function callClaude(systemPrompt, userPrompt, { model = "claude-sonnet-5", schema, betas, fallbacks } = {}) {
   const response = await fetch("/api/claude", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "claude-sonnet-5",
+      model,
       max_tokens: 16000, // Sonnet 5 thinks by default; thinking counts toward this
       system: systemPrompt,
       messages: [{ role: "user", content: userPrompt }],
+      ...(schema && { output_config: { format: { type: "json_schema", schema } } }),
+      ...(fallbacks && { fallbacks }),
+      ...(betas && { betas }),
     }),
   });
   if (!response.ok) {

@@ -11,28 +11,47 @@ const MAX_AUDIO_FILE_BYTES = 4 * 1024 ** 3;     // ponytail: whole-file decode i
 // Same duration-based budget as claude-video's /watch (Claude accepts max 100 images per request)
 const frameBudget = (secs) => secs <= 60 ? 40 : secs <= 180 ? 60 : secs <= 600 ? 80 : 100;
 
-export async function extractFrames(file, { width = 512, onProgress } = {}) {
+async function openVideo(file, width) {
   const url = URL.createObjectURL(file);
   const video = document.createElement("video");
   video.muted = true;
   video.preload = "auto";
   video.src = url;
+  await new Promise((resolve, reject) => {
+    video.onloadedmetadata = resolve;
+    video.onerror = () => { URL.revokeObjectURL(url); reject(new Error("This browser can't read this video format (try an MP4 export).")); };
+  });
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = Math.round((width * video.videoHeight) / video.videoWidth);
+  const grab = async (t) => {
+    await new Promise((resolve) => { video.onseeked = resolve; video.currentTime = t; });
+    canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+    return canvas;
+  };
+  return { video, grab, close: () => URL.revokeObjectURL(url) };
+}
+
+// Full-size still for the YouTube thumbnail / blog featured image (YouTube wants 1280 px, under 2 MB)
+export async function captureFrame(file, t, width = 1280) {
+  const { grab, close } = await openVideo(file, width);
   try {
-    await new Promise((resolve, reject) => {
-      video.onloadedmetadata = resolve;
-      video.onerror = () => reject(new Error("This browser can't read this video format (try an MP4 export)."));
-    });
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = Math.round((width * video.videoHeight) / video.videoWidth);
-    const ctx = canvas.getContext("2d");
+    const canvas = await grab(t);
+    return await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
+  } finally {
+    close();
+  }
+}
+
+export async function extractFrames(file, { width = 512, onProgress } = {}) {
+  const { video, grab, close } = await openVideo(file, width);
+  try {
     const count = frameBudget(video.duration);
     let frames = [];
     // ponytail: uniform sampling, no scene detection/dedup; edited films rarely hold a shot long
     for (let i = 0; i < count; i++) {
       const t = (video.duration * (i + 0.5)) / count;
-      await new Promise((resolve) => { video.onseeked = resolve; video.currentTime = t; });
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const canvas = await grab(t);
       frames.push({ t, data: canvas.toDataURL("image/jpeg", 0.7).split(",")[1] });
       onProgress?.(i + 1, count);
     }
@@ -44,7 +63,7 @@ export async function extractFrames(file, { width = 512, onProgress } = {}) {
     }
     return { duration: video.duration, frames };
   } finally {
-    URL.revokeObjectURL(url);
+    close();
   }
 }
 
@@ -103,10 +122,24 @@ export async function transcribeFilm(file, { onProgress } = {}) {
 
 const fmt = (t) => `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
 
+const str = { type: "string" };
+const strList = { type: "array", items: str };
+const obj = (properties) => ({ type: "object", properties, required: Object.keys(properties), additionalProperties: false });
+const ANALYSIS_SCHEMA = obj({
+  venueName: str,
+  venueSource: { type: "string", enum: ["filename", "speech", "visual", "unknown"] },
+  answers: obj(Object.fromEntries(VENUE_QUESTIONS.map(q => [q.id, str]))),
+  summary: str,
+  speech: strList,
+  details: strList,
+  bestFrameTime: str,
+  chapters: { type: "array", items: obj({ time: str, title: str }) },
+});
+
 // Claude looks at the frames + transcript and returns the questionnaire answers itself.
 export async function analyseFilm({ fileName, frames, duration, transcript, venues }) {
   const library = venues.map(v => `${v.venue_name}${v.location ? ` (${v.location})` : ""}`).join("; ") || "none";
-  const fields = VENUE_QUESTIONS.map(q => `    "${q.id}": "${q.label}"`).join(",\n");
+  const fields = VENUE_QUESTIONS.map(q => `- ${q.id}: ${q.label}`).join("\n");
   const content = [
     ...frames.flatMap(f => [
       { type: "text", text: `Frame at ${fmt(f.t)}` },
@@ -122,17 +155,15 @@ ${transcript || "(no speech was picked up)"}
 
 Work out the venue. Prefer, in order: the file name (match it to the venue library if you can), then venue names spoken or shown on screen, then a visual guess. Never invent a venue.
 
-Return ONLY a JSON object, no code fences:
-{
-  "venueName": "exact venue name, or empty string if unknown",
-  "venueSource": "filename" | "speech" | "visual" | "unknown",
-  "answers": {
+Fill in the JSON fields:
+- venueName: exact venue name, or "" if unknown. venueSource: where the name came from.
+- answers: one entry per questionnaire field below.
 ${fields}
-  },
-  "summary": "4-6 sentences on what actually happens in the film, in order, with timestamps",
-  "speech": ["the most personal or memorable things said in the vows, speeches or readings, quoted as heard, with who said it if clear"],
-  "details": ["specific, true details a couple would recognise: weather, season, flowers, dress, cars, readings, speeches, first dance song if named"]
-}
+- summary: 4-6 sentences on what actually happens in the film, in order, with timestamps.
+- speech: the most personal or memorable things said in the vows, speeches or readings, quoted as heard, with who said it if clear.
+- details: specific, true details a couple would recognise: weather, season, flowers, dress, cars, readings, first dance song if named.
+- bestFrameTime: the MM:SS label of the single best frame for a YouTube thumbnail. Pick the couple together, faces visible, sharp, well lit and emotional, with the setting showing if possible.
+- chapters: 4-8 YouTube chapters in time order. The first is at 00:00, each at least 15 seconds after the last, titles of 2-4 plain words (e.g. "Getting ready", "The ceremony", "Speeches", "First dance").
 
 For coupleStory, ceremonyDetails and speechHighlights, lean on the transcript: what people said about the couple, how they met, what the celebrant and vows focused on, and the 2-4 best short quotes with who said them by role.
 Leave out anything sensitive everywhere (answers, speech, details): illness or diagnoses, deaths, money, family rifts, anything said in confidence. This content will be published.
@@ -142,7 +173,7 @@ For each answer, describe only what you saw or heard, and fold in what was said 
   const raw = await callClaude(
     "You are a wedding videographer reviewing your own edited film to write about it. Be literal and specific. British English.",
     content,
+    { schema: ANALYSIS_SCHEMA },
   );
-  const json = raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1);
-  return JSON.parse(json);
+  return JSON.parse(raw);
 }

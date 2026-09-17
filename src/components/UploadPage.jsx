@@ -6,7 +6,8 @@ import { WixExport } from "./WixExport";
 import { PixiesetExport } from "./PixiesetExport";
 import OtherExport from "./OtherExport";
 import { VenueFormPanel } from "./VenueFormPanel";
-import { extractFrames, transcribeFilm, analyseFilm } from "../videoAnalysis";
+import { extractFrames, transcribeFilm, analyseFilm, captureFrame } from "../videoAnalysis";
+import { chaptersText, toSecs } from "../chapters";
 import { humanize } from "../humanizer";
 
 const CHUNK_SIZE = 4 * 1024 * 1024; // 4 MB
@@ -94,6 +95,8 @@ export function UploadPage({ user, venues = [], onSuccess, onDone, onVenueAdded 
   const [targetKeyword, setTargetKeyword] = useState("");
   const [filmNotes, setFilmNotes] = useState("");
   const [autoNotice, setAutoNotice] = useState("");
+  const [transcript, setTranscript] = useState("");
+  const [chapters, setChapters] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState("");
   const [error, setError] = useState("");
@@ -216,10 +219,27 @@ export function UploadPage({ user, venues = [], onSuccess, onDone, onVenueAdded 
         said.length ? "What was said:" : transcript ? "What was said: nothing clear enough to quote." : "What was said: no speech was picked up from the audio.",
         ...said,
       ].join("\n").trim();
+      const chap = chaptersText(a.chapters);
       setVenueName(name); setVenueQuery(name);
       setSelectedLibraryVenue(lib);
       setVenueAnswers(answers);
       setFilmNotes(notes);
+      setTranscript(transcript);
+      setChapters(chap);
+
+      // Thumbnail: Claude's pick, re-captured at full size (unless one was already chosen)
+      const thumbAt = toSecs(a.bestFrameTime);
+      if (!heroImageRef.current && Number.isFinite(thumbAt)) {
+        try {
+          setLoadingMsg("Grabbing a thumbnail...");
+          const blob = await captureFrame(f, thumbAt);
+          const img = new File([blob], `${f.name.replace(/\.[^.]+$/, "")} thumbnail.jpg`, { type: "image/jpeg" });
+          setHeroImage(img);
+          setHeroImagePreview(URL.createObjectURL(img));
+        } catch (e) {
+          console.warn("[FilmPost] Thumbnail capture failed:", e.message);
+        }
+      }
       setStep(2);
 
       if (!name || a.venueSource !== "filename") {
@@ -228,7 +248,7 @@ export function UploadPage({ user, venues = [], onSuccess, onDone, onVenueAdded 
           : "We couldn't tell the venue from the file name or the film. Add it below, then click Generate Content. Tip: name files like \"Venue Name - Couple.mp4\" to skip this step.");
         return;
       }
-      await generateContent({ venueName: name, answers, libraryVenue: lib, filmNotes: notes });
+      await generateContent({ venueName: name, answers, libraryVenue: lib, filmNotes: notes, transcript, chapters: chap });
     } catch (e) {
       setStep(2);
       setError(`Couldn't watch the film automatically (${e.message}). Fill in the details below instead.`);
@@ -252,6 +272,8 @@ export function UploadPage({ user, venues = [], onSuccess, onDone, onVenueAdded 
     const answers = opts.answers ?? venueAnswers;
     const libVenue = opts.libraryVenue !== undefined ? opts.libraryVenue : selectedLibraryVenue;
     const notes = opts.filmNotes ?? filmNotes;
+    const tr = opts.transcript ?? transcript;
+    const chap = opts.chapters ?? chapters;
     setLoading(true); setLoadingMsg("Researching keywords..."); setError("");
     try {
       let seo = null;
@@ -259,7 +281,7 @@ export function UploadPage({ user, venues = [], onSuccess, onDone, onVenueAdded 
         const r = await fetch("/api/seo-research", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ venue: vn }),
+          body: JSON.stringify({ venue: vn, area: answers.venueLocation || "" }),
         });
         const d = await r.json().catch(() => ({}));
         if (r.ok) seo = d; else console.warn("[FilmPost] SEO research failed:", d.error);
@@ -268,41 +290,43 @@ export function UploadPage({ user, venues = [], onSuccess, onDone, onVenueAdded 
       }
       const keyword = seo?.primaryKeyword || `${vn} wedding videographer`;
       setTargetKeyword(keyword);
-      const seoContext = seo ? [
-        "\n\nKEYWORD RESEARCH (live Google UK data):",
-        seo.keywords.length && `Searches people make (monthly volume): ${seo.keywords.map(k => `${k.keyword} (${k.volume})`).join(", ")}`,
-        seo.questions.length && `Questions Google shows under "People also ask": ${seo.questions.join(" | ")}`,
-        seo.related.length && `Related searches: ${seo.related.join(", ")}`,
-        seo.topPages.length && `Pages currently on page 1: ${seo.topPages.map(p => `${p.title} (${p.domain})`).join(" | ")}`,
-      ].filter(Boolean).join("\n") : "";
       setLoadingMsg("Writing your content...");
 
       const toneInstruction = user?.tone_of_voice
         ? `\n\nWrite in a style that reflects this brand voice: ${user.tone_of_voice}`
         : "";
-      const systemPrompt = `You are a wedding videographer writing about your own work. Write like a real person who films weddings for a living — warm, genuine, and specific to the day. Use plain British English. No fancy words, no flowery language, no corporate tone. Write short sentences. Be direct. Sound human. Never use these words or phrases: breathtaking, stunning, magical, timeless, seamlessly, meticulously, elegant, bespoke, enchanting, nestled, picturesque, idyllic, effortlessly, truly, really special, or any em dashes (—).${toneInstruction}`;
+      const systemPrompt = `You are a wedding videographer writing about your own work. Write like a real person who films weddings for a living: warm, genuine, and specific to the day. Use plain British English. No fancy words, no flowery language, no corporate tone. Write short sentences. Be direct. Sound human. Never use these words or phrases: breathtaking, stunning, magical, timeless, seamlessly, meticulously, elegant, bespoke, enchanting, nestled, picturesque, idyllic, effortlessly, truly, really special. Never use em dashes or en dashes. Never mention illness, deaths, money, family rifts or anything said in confidence.${toneInstruction}`;
       const answersText = VENUE_QUESTIONS.map(q => answers[q.id] ? `${q.label}: ${answers[q.id]}` : "").filter(Boolean).join("\n");
 
       // Enrich prompt with saved venue library details if a library venue was selected
       const venueLibraryContext = libVenue ? [
-        "\n\nAdditional venue details from saved library:",
+        "\n\nFrom the saved venue library:",
         libVenue.venue_type && `Venue type: ${libVenue.venue_type}`,
         libVenue.location && `Location: ${libVenue.location}`,
         libVenue.indoor_outdoor && `Setting: ${libVenue.indoor_outdoor}`,
         libVenue.capacity && `Capacity: ${libVenue.capacity}`,
         libVenue.general_notes && `General notes: ${libVenue.general_notes}`,
       ].filter(Boolean).join("\n") : "";
-      const filmContext = notes ? `\n\nWhat actually happens in the film (from watching it):\n${notes}` : "";
-      const fullAnswersText = answersText + venueLibraryContext + filmContext;
-
-      const title = await callClaude(systemPrompt, `Write a YouTube title for a wedding film at "${vn}".\n\n${fullAnswersText}\n\nInclude the venue name and, if it reads naturally, the search phrase "${keyword}". If the questionnaire includes a couple's names, you may include them. Keep it under 70 characters. Sound natural, not like a magazine headline. Return ONLY the title, no quotes.`);
-      setYoutubeTitle(title.trim());
-
+      const seoBlock = seo ? [
+        "<keyword_research>",
+        "Live Google UK data.",
+        seo.keywords.length && `Searches people make (monthly volume): ${seo.keywords.map(k => `${k.keyword} (${k.volume})`).join(", ")}`,
+        seo.questions.length && `"People also ask" questions: ${seo.questions.join(" | ")}`,
+        seo.related.length && `Related searches: ${seo.related.join(", ")}`,
+        seo.topPages.length && `Pages currently on page 1: ${seo.topPages.map(p => `${p.title} (${p.domain})`).join(" | ")}`,
+        "</keyword_research>",
+      ].filter(Boolean).join("\n") : "";
+      // Long material first, in labelled blocks; instructions go after it
+      const context = [
+        `<wedding_details>\nVenue: ${vn}\n${answersText}${venueLibraryContext}\n</wedding_details>`,
+        notes && `<film_notes>\nWritten after watching the film:\n${notes}\n</film_notes>`,
+        seoBlock,
+      ].filter(Boolean).join("\n\n");
+      const transcriptBlock = tr
+        ? `\n\n<transcript>\nRaw speech-to-text of the film's audio (vows, speeches, readings). Music can garble a few lines. Only quote lines that read clearly, and credit speakers by role.\n${tr}\n</transcript>`
+        : "";
+      const fullAnswersText = context;
       const footer = buildBusinessFooter(user);
-      const desc = await callClaude(systemPrompt, `Write a YouTube description for this wedding film:\nVenue: ${vn}\n${fullAnswersText}\n\nStart with a short, natural opening sentence or two about the day, written like a videographer talking about a wedding they genuinely loved filming. Then cover the filming highlights in plain, specific language. No em dashes. No fancy adjectives. Just honest, warm copy.\n\nDon't add contact details or a sign-off; a business footer is added after your text. Under 3500 characters. Return ONLY the description text.`);
-
-      const tags = await callClaude(systemPrompt, `Generate 12 YouTube tags for a wedding film at "${vn}". Target search phrase: "${keyword}".${seoContext}\n\nWedding details:\n${fullAnswersText.slice(0, 1500)}\n\nMix the venue, the area, and what couples search for. Return ONLY a comma-separated list of tags, no other text.`);
-      setYtTags(tags.trim());
 
       const seoPlugin = user?.seo_plugin || "";
       const seoSection = seoPlugin === "yoast" ? `
@@ -339,11 +363,15 @@ Slug: [url-friendly, lowercase, hyphens, no domain]
 
       const businessName = user?.business_name || "the videographer";
       const businessUrl = user?.website || "";
-      const blog = await callClaude(systemPrompt, `Write an SEO-optimised blog post (900-1200 words) for a wedding videographer's website about filming a wedding at "${vn}".
 
-${fullAnswersText}${seoContext}
+      const [title, desc, tags, blog] = await Promise.all([
+        callClaude(systemPrompt, `${context}\n\nWrite a YouTube title for this wedding film at "${vn}". Include the venue name and, if it reads naturally, the search phrase "${keyword}". You may include the couple's first names. Keep it under 70 characters. Sound natural, not like a magazine headline. Return ONLY the title, no quotes.`),
+        callClaude(systemPrompt, `${context}${transcriptBlock}\n\nWrite a YouTube description for this wedding film. Start with a short, natural opening sentence or two about the day, written like a videographer talking about a wedding they genuinely loved filming. Use "${keyword}" once where it reads naturally. Then cover the highlights of the day in plain, specific language. No fancy adjectives. Just honest, warm copy.\n\nDon't add chapters, contact details or a sign-off; those are added after your text. Under 3000 characters. Return ONLY the description text.`),
+        callClaude(systemPrompt, `${context}\n\nGenerate 12 YouTube tags for this wedding film at "${vn}". Include "${keyword}". Mix the venue, the town and region, and what couples search for, using the keyword research where it fits. Return ONLY a comma-separated list of tags, no other text.`),
+        // Opus 5 for the long-form piece; "default" fallbacks re-run a safety decline on another model
+        callClaude(systemPrompt, `${context}${transcriptBlock}
 
-Write like a videographer who was actually there. Use plain, conversational British English. Short paragraphs. Short sentences. No em dashes. No words like stunning, magical, breathtaking, timeless, seamlessly, meticulously, nestled, or picturesque.
+Write an SEO-optimised blog post (900-1200 words) for a wedding videographer's website about filming this wedding at "${vn}". Write like the videographer who was there. Plain, conversational British English. Short paragraphs. Short sentences.
 
 MANDATORY STRUCTURE:
 
@@ -373,35 +401,39 @@ Output a <script type="application/ld+json"> block using VideoObject schema:
 
 INTRODUCTION (2-3 sentences in a <p> tag): The first sentence must include the exact phrase "${keyword}". Summarise the post clearly. Name the venue, its location, and what made the day stand out. Write it so someone googling the venue gets a direct, useful answer.
 
-SEO KEYPHRASE: The target keyphrase is "${keyword}"${seo?.secondaryKeyword ? ` (also work in "${seo.secondaryKeyword}" once)` : ""}. Beyond the introduction, it must also appear naturally in at least one H2 or H3 heading, and in the meta description if an SEO plugin block is requested below.
+SEO KEYPHRASE: The target keyphrase is "${keyword}"${seo?.secondaryKeywords?.length ? ` (also work in ${seo.secondaryKeywords.map(k => `"${k}"`).join(" and ")} once each)` : ""}. Beyond the introduction, it must also appear naturally in at least one H2 or H3 heading, and in the meta description if an SEO plugin block is requested below.
 
 BODY SECTIONS using H2 headings phrased as questions couples actually search for:
 - "What is ${vn} like as a wedding venue?"
 - "What is it like to film a wedding at ${vn}?"
 - "Why do couples choose ${vn}?"
 If the keyword research lists "People also ask" questions that fit this venue, use them as H2s or FAQ questions instead, worded exactly as searched.
-Use H3 sub-headings where they help. Keep paragraphs to 2-4 sentences. Reference the venue's county or region where you can. Use specific details from the questionnaire, real moments, not generic descriptions.
+Use H3 sub-headings where they help. Keep paragraphs to 2-4 sentences. Reference the venue's county or region where you can. Use specific details from <wedding_details>, <film_notes> and <transcript>: real moments, not generic descriptions.
 If the questionnaire has the couple's story, ceremony or speech lines, add one H2 about this couple's day (e.g. "${answers.coupleNames ? `${answers.coupleNames}'s` : "This"} wedding at ${vn}") and weave in one or two short quotes, credited by role ("the best man", "the bride's father"), not by guests' full names. Never mention illness, deaths, money or anything private.
 
-CALL TO ACTION — one final <p> with one <strong> phrase: Keep it short and genuine. One or two sentences. Not salesy.
+CALL TO ACTION: one final <p> with one <strong> phrase: Keep it short and genuine. One or two sentences. Not salesy.
 
 3. FAQ SECTION
 <h2>Frequently Asked Questions about Weddings at ${vn}</h2>
 
-3-4 Q&As using <h3> for questions and <p> for answers. Base answers on the questionnaire details. If you don't know something like guest numbers, write around it rather than making it up.
+3-4 Q&As using <h3> for questions and <p> for answers. Base answers on the details you have been given. If you don't know something like guest numbers, write around it rather than making it up.
 
-OUTBOUND LINK: ${answers.venueWebsite ? `Include one natural outbound link to the venue's own website (${answers.venueWebsite}). Use the venue name "${vn}" as the anchor text. Place it where it reads naturally in context — do not force it.` : "No venue website has been provided, so do not invent or guess a URL."}
+OUTBOUND LINK: ${answers.venueWebsite ? `Include one natural outbound link to the venue's own website (${answers.venueWebsite}). Use the venue name "${vn}" as the anchor text. Place it where it reads naturally in context and do not force it.` : "No venue website has been provided, so do not invent or guess a URL."}
 
 HTML tags allowed: <script> (JSON-LD only), <h1>, <h2>, <h3>, <p>, <strong>, <a> (for the venue outbound link only). No <html>, <body>, or <head> tags.
 ${seoSection}
-Return ONLY the JSON-LD block followed by the blog post HTML.`);
+Return ONLY the JSON-LD block followed by the blog post HTML.`, { model: "claude-opus-5", betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" }),
+      ]);
+      setYoutubeTitle(title.trim());
+      setYtTags(tags.trim());
+
       setLoadingMsg("Polishing the writing...");
-      const keepPhrases = [keyword, vn, seo?.secondaryKeyword].filter(Boolean);
+      const keepPhrases = [keyword, vn, ...(seo?.secondaryKeywords || [])];
       const [humanDesc, humanBlog] = await Promise.all([
         humanize(desc, { keywords: keepPhrases }),
         humanize(blog, { keywords: keepPhrases, html: true }),
       ]);
-      const fullDesc = `${humanDesc}\n\n${footer}`;
+      const fullDesc = [humanDesc, chap && `Chapters\n${chap}`, footer].filter(Boolean).join("\n\n");
       setYoutubeDesc(fullDesc);
 
       const finalBlog = user.blog_template === "film_suppliers"
