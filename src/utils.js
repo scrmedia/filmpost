@@ -40,7 +40,7 @@ export async function callClaude(systemPrompt, userPrompt) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       model: "claude-sonnet-5",
-      max_tokens: 4000,
+      max_tokens: 16000, // Sonnet 5 thinks by default; thinking counts toward this
       system: systemPrompt,
       messages: [{ role: "user", content: userPrompt }],
     }),
@@ -50,5 +50,9 @@ export async function callClaude(systemPrompt, userPrompt) {
     throw new Error(err?.error?.message || `API error ${response.status}`);
   }
   const data = await response.json();
-  return data.content?.[0]?.text || "";
+  if (data.stop_reason === "refusal") throw new Error("Claude declined this request");
+  // Replies start with a thinking block, so join the text blocks rather than reading content[0]
+  const text = (data.content || []).filter(b => b.type === "text").map(b => b.text).join("");
+  if (!text) throw new Error(`Claude returned no text (stop reason: ${data.stop_reason})`);
+  return text;
 }
