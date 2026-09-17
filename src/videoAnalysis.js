@@ -6,7 +6,7 @@ import { callClaude, VENUE_QUESTIONS } from "./utils";
 const SAMPLE_RATE = 16000;
 const CHUNK_SECONDS = 120;                      // 120 s of 16 kHz mono WAV ≈ 3.8 MB
 const MAX_FRAME_BYTES = 3.8 * 1024 * 1024;   // base64 frames must fit under Vercel's 4.5 MB body limit
-const MAX_AUDIO_FILE_BYTES = 1.5 * 1024 ** 3;   // ponytail: whole-file decode in memory; stream via WebCodecs if bigger films matter
+const MAX_AUDIO_FILE_BYTES = 4 * 1024 ** 3;     // ponytail: whole-file decode in memory (1.6 GB 4K film: 2 s); stream via WebCodecs if bigger films matter
 
 // Same duration-based budget as claude-video's /watch (Claude accepts max 100 images per request)
 const frameBudget = (secs) => secs <= 60 ? 40 : secs <= 180 ? 60 : secs <= 600 ? 80 : 100;
