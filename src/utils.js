@@ -8,6 +8,7 @@ export const supabase = createClient(
 export const VENUE_QUESTIONS = [
   { id: "venueStyle", label: "Venue Style / Character", placeholder: "e.g. Rustic barn, grand manor, modern minimalist...", type: "text" },
   { id: "venueSetting", label: "Surrounding Setting & Scenery", placeholder: "e.g. Rolling Cotswold hills, woodland, lakeside...", type: "text" },
+  { id: "venueLocation", label: "Town / Region", placeholder: "e.g. Tropea, Calabria, Italy", type: "text" },
   { id: "filmingHighlights", label: "Best Spots for Filming", placeholder: "e.g. Oak-lined driveway, walled garden, dramatic staircase...", type: "textarea" },
   { id: "lightingNotes", label: "Lighting Character", placeholder: "e.g. Flood of natural light, moody candlelit reception...", type: "text" },
   { id: "droneAccess", label: "Drone / Aerial Access", placeholder: "e.g. Full drone access, stunning aerial approach...", type: "text" },
@@ -15,6 +16,11 @@ export const VENUE_QUESTIONS = [
   { id: "standoutMemory", label: "A Standout or Memorable Moment", placeholder: "Share a specific story — a moment that made a wedding here unforgettable...", type: "textarea" },
   { id: "proTip", label: "Your Pro Videographer Tip", placeholder: "What advice would you give couples to get the most from filming here?", type: "textarea" },
   { id: "coupleNames", label: "Featured Couple's Names", placeholder: "e.g. Emily & James — leave blank to omit", type: "text" },
+  { id: "coupleStory", label: "The Couple's Story", placeholder: "How they met, what friends and family said about them, what they're like together...", type: "textarea" },
+  { id: "ceremonyDetails", label: "The Ceremony", placeholder: "Type of ceremony, who led it, readings, the walk down the aisle, what the vows focused on...", type: "textarea" },
+  { id: "speechHighlights", label: "Best Lines from the Speeches & Vows", placeholder: "Short quotes worth using, with who said them (e.g. the best man, the bride's father)...", type: "textarea" },
+  { id: "musicEntertainment", label: "Music & Entertainment", placeholder: "e.g. Live band with a sax player, first dance song, fireworks...", type: "text" },
+  { id: "stylingDetails", label: "Styling, Flowers & Outfits", placeholder: "e.g. Wildflowers in glass bottles, strapless gown with cathedral veil, black tie...", type: "textarea" },
   { id: "venueWebsite", label: "Venue Website", placeholder: "https://www.venuename.co.uk — leave blank if unknown", type: "text" },
 ];
 

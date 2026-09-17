@@ -134,6 +134,8 @@ ${fields}
   "details": ["specific, true details a couple would recognise: weather, season, flowers, dress, cars, readings, speeches, first dance song if named"]
 }
 
+For coupleStory, ceremonyDetails and speechHighlights, lean on the transcript: what people said about the couple, how they met, what the celebrant and vows focused on, and the 2-4 best short quotes with who said them by role.
+Leave out anything sensitive everywhere (answers, speech, details): illness or diagnoses, deaths, money, family rifts, anything said in confidence. This content will be published.
 Write plainly in British English. Never use em dashes or en dashes.
 For each answer, describe only what you saw or heard, and fold in what was said where it fits (standoutMemory especially). Use an empty string when the film gives no evidence. coupleNames only if names are clearly spoken or shown. venueWebsite stays empty unless it appears on screen.` },
   ];

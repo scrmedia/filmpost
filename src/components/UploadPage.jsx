@@ -380,7 +380,8 @@ BODY SECTIONS using H2 headings phrased as questions couples actually search for
 - "What is it like to film a wedding at ${vn}?"
 - "Why do couples choose ${vn}?"
 If the keyword research lists "People also ask" questions that fit this venue, use them as H2s or FAQ questions instead, worded exactly as searched.
-Use H3 sub-headings where they help. Keep paragraphs to 2-4 sentences. Reference the venue's county or region where you can. Use specific details from the questionnaire — real moments, not generic descriptions.
+Use H3 sub-headings where they help. Keep paragraphs to 2-4 sentences. Reference the venue's county or region where you can. Use specific details from the questionnaire, real moments, not generic descriptions.
+If the questionnaire has the couple's story, ceremony or speech lines, add one H2 about this couple's day (e.g. "${answers.coupleNames ? `${answers.coupleNames}'s` : "This"} wedding at ${vn}") and weave in one or two short quotes, credited by role ("the best man", "the bride's father"), not by guests' full names. Never mention illness, deaths, money or anything private.
 
 CALL TO ACTION — one final <p> with one <strong> phrase: Keep it short and genuine. One or two sentences. Not salesy.
 
