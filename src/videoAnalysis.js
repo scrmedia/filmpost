@@ -5,9 +5,13 @@ import { callClaude, VENUE_QUESTIONS } from "./utils";
 
 const SAMPLE_RATE = 16000;
 const CHUNK_SECONDS = 120;                      // 120 s of 16 kHz mono WAV ≈ 3.8 MB
+const MAX_FRAME_BYTES = 3.8 * 1024 * 1024;   // base64 frames must fit under Vercel's 4.5 MB body limit
 const MAX_AUDIO_FILE_BYTES = 1.5 * 1024 ** 3;   // ponytail: whole-file decode in memory; stream via WebCodecs if bigger films matter
 
-export async function extractFrames(file, { count = 24, width = 512, onProgress } = {}) {
+// Same duration-based budget as claude-video's /watch (Claude accepts max 100 images per request)
+const frameBudget = (secs) => secs <= 60 ? 40 : secs <= 180 ? 60 : secs <= 600 ? 80 : 100;
+
+export async function extractFrames(file, { width = 512, onProgress } = {}) {
   const url = URL.createObjectURL(file);
   const video = document.createElement("video");
   video.muted = true;
@@ -22,7 +26,8 @@ export async function extractFrames(file, { count = 24, width = 512, onProgress 
     canvas.width = width;
     canvas.height = Math.round((width * video.videoHeight) / video.videoWidth);
     const ctx = canvas.getContext("2d");
-    const frames = [];
+    const count = frameBudget(video.duration);
+    let frames = [];
     // ponytail: uniform sampling, no scene detection/dedup; edited films rarely hold a shot long
     for (let i = 0; i < count; i++) {
       const t = (video.duration * (i + 0.5)) / count;
@@ -30,6 +35,12 @@ export async function extractFrames(file, { count = 24, width = 512, onProgress 
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       frames.push({ t, data: canvas.toDataURL("image/jpeg", 0.7).split(",")[1] });
       onProgress?.(i + 1, count);
+    }
+    // Busy footage compresses worse; thin evenly until the request fits
+    const bytes = frames.reduce((s, f) => s + f.data.length, 0);
+    if (bytes > MAX_FRAME_BYTES) {
+      const step = Math.ceil(bytes / MAX_FRAME_BYTES);
+      frames = frames.filter((_, i) => i % step === 0);
     }
     return { duration: video.duration, frames };
   } finally {
