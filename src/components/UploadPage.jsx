@@ -6,7 +6,7 @@ import { WixExport } from "./WixExport";
 import { PixiesetExport } from "./PixiesetExport";
 import OtherExport from "./OtherExport";
 import { VenueFormPanel } from "./VenueFormPanel";
-import { extractFrames, transcribeFilm, analyseFilm, captureFrame } from "../videoAnalysis";
+import { extractFrames, transcribeFilm, analyseFilm, nearestFrame } from "../videoAnalysis";
 import { chaptersText, toSecs } from "../chapters";
 import { humanize } from "../humanizer";
 
@@ -230,15 +230,10 @@ export function UploadPage({ user, venues = [], onSuccess, onDone, onVenueAdded 
       // Thumbnail: Claude's pick, re-captured at full size (unless one was already chosen)
       const thumbAt = toSecs(a.bestFrameTime);
       if (!heroImageRef.current && Number.isFinite(thumbAt)) {
-        try {
-          setLoadingMsg("Grabbing a thumbnail...");
-          const blob = await captureFrame(f, thumbAt);
-          const img = new File([blob], `${f.name.replace(/\.[^.]+$/, "")} thumbnail.jpg`, { type: "image/jpeg" });
-          setHeroImage(img);
-          setHeroImagePreview(URL.createObjectURL(img));
-        } catch (e) {
-          console.warn("[FilmPost] Thumbnail capture failed:", e.message);
-        }
+        const { blob } = nearestFrame(frames, thumbAt);
+        const img = new File([blob], `${f.name.replace(/\.[^.]+$/, "")} thumbnail.jpg`, { type: "image/jpeg" });
+        setHeroImage(img);
+        setHeroImagePreview(URL.createObjectURL(img));
       }
       setStep(2);
 

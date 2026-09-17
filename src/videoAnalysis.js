@@ -11,48 +11,37 @@ const MAX_AUDIO_FILE_BYTES = 4 * 1024 ** 3;     // ponytail: whole-file decode i
 // Same duration-based budget as claude-video's /watch (Claude accepts max 100 images per request)
 const frameBudget = (secs) => secs <= 60 ? 40 : secs <= 180 ? 60 : secs <= 600 ? 80 : 100;
 
-async function openVideo(file, width) {
+const SEEK_TIMEOUT_MS = 20000;
+
+export async function extractFrames(file, { width = 512, fullWidth = 1280, onProgress } = {}) {
   const url = URL.createObjectURL(file);
   const video = document.createElement("video");
   video.muted = true;
   video.preload = "auto";
   video.src = url;
-  await new Promise((resolve, reject) => {
-    video.onloadedmetadata = resolve;
-    video.onerror = () => { URL.revokeObjectURL(url); reject(new Error("This browser can't read this video format (try an MP4 export).")); };
+  // Chrome can stall media in a background tab; fail loudly instead of hanging
+  const waitFor = (event, what) => new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`Timed out ${what}. Keep this tab open while the film is analysed.`)), SEEK_TIMEOUT_MS);
+    video.addEventListener(event, () => { clearTimeout(timer); resolve(); }, { once: true });
+    video.onerror = () => { clearTimeout(timer); reject(new Error("This browser can't read this video format (try an MP4 export).")); };
   });
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = Math.round((width * video.videoHeight) / video.videoWidth);
-  const grab = async (t) => {
-    await new Promise((resolve) => { video.onseeked = resolve; video.currentTime = t; });
-    canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
-    return canvas;
-  };
-  return { video, grab, close: () => URL.revokeObjectURL(url) };
-}
-
-// Full-size still for the YouTube thumbnail / blog featured image (YouTube wants 1280 px, under 2 MB)
-export async function captureFrame(file, t, width = 1280) {
-  const { grab, close } = await openVideo(file, width);
   try {
-    const canvas = await grab(t);
-    return await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
-  } finally {
-    close();
-  }
-}
-
-export async function extractFrames(file, { width = 512, onProgress } = {}) {
-  const { video, grab, close } = await openVideo(file, width);
-  try {
+    await waitFor("loadedmetadata", "loading the video");
+    const size = (w) => { const c = document.createElement("canvas"); c.width = w; c.height = Math.round((w * video.videoHeight) / video.videoWidth); return c; };
+    const full = size(fullWidth), small = size(width);
     const count = frameBudget(video.duration);
     let frames = [];
     // ponytail: uniform sampling, no scene detection/dedup; edited films rarely hold a shot long
     for (let i = 0; i < count; i++) {
       const t = (video.duration * (i + 0.5)) / count;
-      const canvas = await grab(t);
-      frames.push({ t, data: canvas.toDataURL("image/jpeg", 0.7).split(",")[1] });
+      const seeked = waitFor("seeked", "reading the video");
+      video.currentTime = t;
+      await seeked;
+      full.getContext("2d").drawImage(video, 0, 0, full.width, full.height);
+      small.getContext("2d").drawImage(full, 0, 0, small.width, small.height);
+      // Full-size copy kept so the thumbnail needs no second pass (YouTube wants 1280 px, under 2 MB)
+      const blob = await new Promise((resolve) => full.toBlob(resolve, "image/jpeg", 0.9));
+      frames.push({ t, data: small.toDataURL("image/jpeg", 0.7).split(",")[1], blob });
       onProgress?.(i + 1, count);
     }
     // Busy footage compresses worse; thin evenly until the request fits
@@ -63,9 +52,15 @@ export async function extractFrames(file, { width = 512, onProgress } = {}) {
     }
     return { duration: video.duration, frames };
   } finally {
-    close();
+    URL.revokeObjectURL(url);
+    video.removeAttribute("src");
+    video.load(); // release the decoder
   }
 }
+
+// Full-size frame nearest to Claude's pick
+export const nearestFrame = (frames, t) =>
+  frames.reduce((best, f) => (Math.abs(f.t - t) < Math.abs(best.t - t) ? f : best), frames[0]);
 
 function encodeWav(samples) {
   const view = new DataView(new ArrayBuffer(44 + samples.length * 2));
